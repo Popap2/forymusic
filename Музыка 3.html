@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>MusicWave — все для вас!</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root {
+      /* Цвета максимально близко к Яндекс Музыке */
+      --bg: #111317;
+      --bg-elevated: #181a1f;
+      --bg-soft: #20232b;
+      --accent: #ffcc00;
+      --accent-soft: rgba(255, 204, 0, 0.18);
+      --text: #f9fafb;
+      --text-muted: #8b8f99;
+      --border: #2b2e37;
+      --radius-lg: 14px;
+      --radius-md: 10px;
+      --shadow: 0 18px 40px rgba(0, 0, 0, 0.7);
+      --transition: 0.18s ease-out;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
+      padding: 0;
+    }
+    .app {
+      width: 100%;
+      max-width: 1280px;
+      margin: 0 auto;
+      background: var(--bg);
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      grid-template-rows: 56px minmax(0, 1fr) 80px;
+      grid-template-areas:
+        "header header"
+        "sidebar main"
+        "player player";
+    }
+    @media (max-width: 820px) {
+      .app {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: 60px auto minmax(0, 1fr) 80px;
+        grid-template-areas:
+          "header"
+          "sidebar"
+          "main"
+          "player";
+      }
+    }
+
+    .header {
+      grid-area: header;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.7);
+      background: #181a1f;
+    }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-icon {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: radial-gradient(circle at 30% 0, #ffcc00, #ff9800);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; color: #111317;
+    }
+    .logo-text { font-size: 16px; font-weight: 700; }
+    .header-actions { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+    .user-email {
+      color: var(--text-muted);
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .btn-outline {
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      font-size: 12px;
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      transition: background var(--transition), border-color var(--transition);
+    }
+    .btn-outline:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: #3b3f4a;
+    }
+    .btn-accent {
+      border-radius: 999px;
+      border: none;
+      padding: 6px 14px;
+      font-size: 12px;
+      background: var(--accent);
+      color: #111317;
+      cursor: pointer;
+      font-weight: 600;
+      transition: filter var(--transition), transform var(--transition);
+    }
+    .btn-accent:hover {
+      filter: brightness(1.05);
+      transform: translateY(-1px);
+    }
+
+    .sidebar {
+      grid-area: sidebar;
+      border-right: 1px solid rgba(0, 0, 0, 0.7);
+      background: #181a1f;
+      padding: 12px 16px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .nav-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: #6d717c;
+      margin: 8px 0 6px;
+    }
+    .nav-list { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+    .nav-item {
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-size: 13px;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background var(--transition), color var(--transition), transform var(--transition);
+    }
+    .nav-item span:nth-child(1) { font-weight: 500; }
+    .nav-item:hover {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      transform: translateY(-1px);
+    }
+    .nav-item.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .playlist-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      max-height: 180px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+    .playlist-item {
+      font-size: 12px;
+      padding: 5px 6px;
+      border-radius: 9px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background var(--transition), color var(--transition);
+    }
+    .playlist-item:hover {
+      background: var(--bg-soft);
+      color: var(--text);
+    }
+    .user-mini {
+      margin-top: auto;
+      padding-top: 10px;
+      border-top: 1px solid rgba(0, 0, 0, 0.7);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .main {
+      grid-area: main;
+      padding: 16px 24px;
+      background: var(--bg-elevated);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .search {
+      width: 100%;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      background: var(--bg-soft);
+      border-radius: 999px;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .search input {
+      border: none; background: transparent; color: var(--text);
+      outline: none; font-size: 13px; width: 100%;
+    }
+    .search input::placeholder { color: var(--text-muted); }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; margin-bottom: 6px; }
+    .chip {
+      padding: 5px 9px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--text-muted);
+      cursor: pointer;
+      background: transparent;
+      transition: background var(--transition), color var(--transition), border-color var(--transition);
+    }
+    .chip:hover { background: var(--bg-soft); color: var(--text); }
+    .chip.active { border-color: transparent; background: var(--accent); color: #020204; }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 6px;
+      margin-bottom: 8px;
+    }
+    .section-title { font-size: 18px; font-weight: 600; }
+    .section-sub { font-size: 12px; color: var(--text-muted); }
+    .section-link { font-size: 11px; color: var(--text-muted); cursor: pointer; }
+    .section-link:hover { color: var(--accent); }
+
+    .track-list {
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      background: #1b1e24;
+      overflow: hidden;
+    }
+    .track-row {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1.8fr) minmax(0, 1fr) 60px;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background var(--transition);
+    }
+    @media (max-width: 640px) {
+      .track-row {
+        grid-template-columns: 26px minmax(0, 2fr) 55px;
+        grid-template-rows: auto auto;
+        row-gap: 2px;
+      }
+      .track-artist { grid-column: 2 / 3; }
+      .track-album { display: none; }
+    }
+    .track-row:nth-child(odd),
+    .track-row:nth-child(even) {
+      background: transparent;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.8);
+    }
+    .track-row:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .track-row.active {
+      background: rgba(255, 255, 255, 0.06);
+      border-left: 3px solid var(--accent);
+    }
+    .track-index { font-size: 11px; color: var(--text-muted); text-align: center; }
+    .track-title {
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .track-artist {
+      font-size: 12px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .track-album {
+      font-size: 12px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .track-time { font-size: 12px; text-align: right; color: var(--text-muted); }
+    .track-actions { display: flex; gap: 8px; margin-top: 8px; }
+    .btn-small {
+      font-size: 11px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background var(--transition), color var(--transition), border-color var(--transition);
+    }
+    .btn-small:hover {
+      background: var(--bg-soft);
+      color: var(--text);
+      border-color: #4b5563;
+    }
+
+    .add-track-panel {
+      display: none;
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: var(--radius-lg);
+      border: 1px dashed var(--border);
+      background: #181a1f;
+      font-size: 12px;
+    }
+    .add-track-title {
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .add-track-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+    }
+    .add-track-row .form-input {
+      flex: 1;
+      min-width: 120px;
+    }
+    .add-track-hint {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .player {
+      grid-area: player;
+      padding: 10px 24px;
+      border-top: 1px solid rgba(0, 0, 0, 0.8);
+      background: #181a1f;
+      display: grid;
+      grid-template-columns: minmax(0, 1.7fr) minmax(0, 2fr) minmax(0, 1.2fr);
+      align-items: center;
+      gap: 14px;
+    }
+    @media (max-width: 820px) {
+      .player {
+        grid-template-columns: minmax(0, 1.7fr) minmax(0, 2fr);
+        grid-template-rows: auto auto;
+      }
+    }
+    @media (max-width: 640px) {
+      .player {
+        grid-template-columns: minmax(0, 1fr);
+        grid-auto-rows: auto;
+      }
+    }
+    .player-track { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .player-cover {
+      width: 46px; height: 46px; border-radius: 12px;
+      background: radial-gradient(circle at 30% 0, #facc15, #f97316);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; color: #020204; font-weight: 700;
+    }
+    .player-meta { min-width: 0; }
+    .player-title {
+      font-size: 13px; font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .player-artist {
+      font-size: 11px; color: var(--text-muted);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .player-controls {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+    }
+    .player-btns { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+    .icon-btn {
+      width: 26px; height: 26px; border-radius: 999px;
+      border: 1px solid var(--border);
+      background: transparent; color: var(--text-muted);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 12px;
+      transition: background var(--transition), color var(--transition), border-color var(--transition), transform var(--transition);
+    }
+    .icon-btn:hover {
+      background: var(--bg-soft);
+      color: var(--text);
+      border-color: #4b5563;
+      transform: translateY(-1px);
+    }
+    .icon-btn.main { width: 32px; height: 32px; border-color: var(--accent); color: var(--accent); }
+    .player-time { display: flex; align-items: center; gap: 8px; width: 100%; }
+    .player-time span { font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+    .progress {
+      flex: 1; height: 4px; border-radius: 999px;
+      background: #111827; overflow: hidden;
+      position: relative; cursor: pointer;
+    }
+    .progress-inner {
+      position: absolute; inset: 0; width: 0%;
+      background: linear-gradient(90deg, #facc15, #f97316);
+    }
+    .player-extra {
+      display: flex; align-items: center; justify-content: flex-end;
+      gap: 10px; font-size: 11px; color: var(--text-muted);
+    }
+    .volume { display: flex; align-items: center; gap: 6px; min-width: 90px; }
+    .volume input[type="range"] { width: 80px; }
+
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+    }
+    .modal {
+      width: 100%; max-width: 360px;
+      background: #020204;
+      border-radius: 16px;
+      padding: 16px 16px 14px;
+      border: 1px solid rgba(250, 204, 21, 0.7);
+      box-shadow: 0 30px 70px rgba(0, 0, 0, 0.95);
+      color: var(--text);
+    }
+    .modal-header {
+      display: flex; justify-content: space-between;
+      align-items: center; margin-bottom: 8px;
+    }
+    .modal-header h2 { font-size: 16px; }
+    .modal-close {
+      border: none; background: transparent;
+      color: var(--text-muted); font-size: 20px; cursor: pointer;
+    }
+    .modal-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+    .form-group { margin-bottom: 8px; }
+    .form-group label { display: block; font-size: 12px; margin-bottom: 3px; }
+    .form-input {
+      width: 100%; border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #020204; color: var(--text);
+      font-size: 13px; padding: 7px 9px;
+      outline: none;
+    }
+    .form-input:focus {
+      border-color: #facc15;
+      box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.35);
+    }
+    .modal-footer {
+      margin-top: 6px;
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 11px; color: var(--text-muted);
+    }
+    .modal-footer button {
+      border: none; background: transparent;
+      color: var(--accent); cursor: pointer;
+      font-size: 11px; padding: 0;
+    }
+
+    .playlist-list::-webkit-scrollbar { width: 4px; }
+    .playlist-list::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 999px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="logo">
+        <div class="logo-icon">MW</div>
+        <div class="logo-text">MusicWave</div>
+      </div>
+      <div class="header-actions">
+        <span class="user-email" id="headerUserEmail">Гость</span>
+        <button id="loginBtn" class="btn-outline">Войти</button>
+        <button id="registerBtn" class="btn-accent">Регистрация</button>
+        <button id="logoutBtn" class="btn-outline" style="display:none;">Выйти</button>
+      </div>
+    </header>
+
+    <aside class="sidebar">
+      <div>
+        <div class="nav-title">Разделы</div>
+        <ul class="nav-list">
+          <li id="navHome" class="nav-item active"><span>Главная</span><span>●</span></li>
+          <li id="navMyMusic" class="nav-item"><span>Моя музыка</span><span>▶</span></li>
+          <li id="navPlaylists" class="nav-item"><span>Плейлисты</span><span>♪</span></li>
+        </ul>
+      </div>
+
+      <div class="user-mini" id="sidebarUserInfo">
+        Гость · войдите, чтобы сохранять треки и плейлисты
+      </div>
+    </aside>
+
+    <main class="main">
+      <div>
+        <div class="search">
+          🔍
+          <input id="searchInput" type="text" placeholder="Искать трек или исполнителя..." />
+        </div>
+        <div class="chips">
+          <button class="chip active" data-filter="all">Все</button>
+          <button class="chip" data-filter="calm">Спокойное</button>
+          <button class="chip" data-filter="energetic">Энергичное</button>
+          <button class="chip" data-filter="instrumental">Инструментал</button>
+        </div>
+      </div>
+
+      <section>
+        <div class="section-header">
+          <div>
+            <div id="sectionTitle" class="section-title">Плейлист дня</div>
+            <div id="sectionSub" class="section-sub">Рабочий плеер + регистрация через localStorage</div>
+          </div>
+          <div class="section-link" id="shuffleBtn">Перемешать</div>
+        </div>
+
+        <div class="track-list" id="trackList"></div>
+
+        <div class="track-actions">
+          <button id="addToPlaylistBtn" class="btn-small">+ Добавить в плейлист</button>
+          <button id="likeBtn" class="btn-small">♡ Лайк</button>
+        </div>
+
+        <div class="add-track-panel">
+          <div class="add-track-title">Добавить свой трек</div>
+          <div class="add-track-row">
+            <input id="userTrackTitle" class="form-input" type="text" placeholder="Название трека" />
+            <input id="userTrackArtist" class="form-input" type="text" placeholder="Исполнитель (необязательно)" />
+          </div>
+      <div class="add-track-row">
+        <input id="userTrackFile" class="form-input" type="file" accept="audio/*" />
+        <input id="adminPasswordInput" class="form-input" type="password" placeholder="Admin‑пароль (только для владельца)" />
+        <button id="addTrackBtn" class="btn-accent" style="white-space:nowrap;">Добавить трек</button>
+      </div>
+      <div class="add-track-hint">
+        Файл загружается на сервер и сохраняется в базе данных. 
+        Управлять треками может только владелец (по admin‑паролю).
+      </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="player">
+      <div class="player-track">
+        <div class="player-cover" id="playerCover">T</div>
+        <div class="player-meta">
+          <div class="player-title" id="playerTitle">Не выбрано</div>
+          <div class="player-artist" id="playerArtist">Выберите трек из списка</div>
+        </div>
+      </div>
+
+      <div class="player-controls">
+        <div class="player-btns">
+          <button id="prevBtn" class="icon-btn">⏮</button>
+          <button id="playPauseBtn" class="icon-btn main">▶</button>
+          <button id="nextBtn" class="icon-btn">⏭</button>
+        </div>
+        <div class="player-time">
+          <span id="currentTime">0:00</span>
+          <div class="progress" id="progressBar">
+            <div class="progress-inner" id="progressInner"></div>
+          </div>
+          <span id="duration">0:00</span>
+        </div>
+      </div>
+
+      <div class="player-extra">
+        <div class="volume">
+          🔊
+          <input id="volumeRange" type="range" min="0" max="1" step="0.01" value="0.8" />
+        </div>
+        <span id="playerStatus">Гость · данные хранятся в браузере</span>
+      </div>
+    </footer>
+  </div>
+
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modalTitle">Вход</h2>
+        <button class="modal-close" id="modalClose">×</button>
+      </div>
+      <p class="modal-sub" id="modalSub">
+        Данные сохраняются только в этом браузере (localStorage), без сервера.
+      </p>
+      <form id="authForm">
+        <div class="form-group">
+          <label for="emailInput">Email</label>
+          <input id="emailInput" class="form-input" type="email" placeholder="you@example.com" required />
+        </div>
+        <div class="form-group">
+          <label for="passwordInput">Пароль</label>
+          <input id="passwordInput" class="form-input" type="password" placeholder="Минимум 4 символа" required />
+        </div>
+        <button type="submit" class="btn-accent" style="width:100%;margin-top:4px;">Продолжить</button>
+      </form>
+      <div class="modal-footer">
+        <span id="modalSwitchText">Нет аккаунта?</span>
+        <button id="modalSwitchBtn" type="button">Регистрация</button>
+      </div>
+    </div>
+  </div>
+
+  <audio id="audio"></audio>
+
+  <script>
+    // ВЕСЬ JS — БЕЗ СОВРЕМЕННОГО СИНТАКСИСА
+    var STORAGE_USERS_KEY = "mw_users";
+    var STORAGE_CURRENT_USER_KEY = "mw_current_user";
+
+    function loadUsers() {
+      try {
+        var raw = localStorage.getItem(STORAGE_USERS_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+    function saveUsers(users) {
+      localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users));
+    }
+    function loadCurrentUser() {
+      try {
+        var raw = localStorage.getItem(STORAGE_CURRENT_USER_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+    function saveCurrentUser(user) {
+      if (user) {
+        localStorage.setItem(STORAGE_CURRENT_USER_KEY, JSON.stringify({ email: user.email }));
+      } else {
+        localStorage.removeItem(STORAGE_CURRENT_USER_KEY);
+      }
+    }
+
+    var users = loadUsers();
+    var currentUser = null;
+
+    function findUserByEmail(email) {
+      for (var i = 0; i < users.length; i++) {
+        if (users[i].email === email) return users[i];
+      }
+      return null;
+    }
+    function getCurrentUserFull() {
+      if (!currentUser) return null;
+      return findUserByEmail(currentUser.email);
+    }
+
+    // Базовые демо‑треки (онлайн), + сюда будут добавляться треки из БД
+    var tracks = [
+      { id: "t1", title: "Lofi Morning",  artist: "Beat Studio",  album: "Soft Focus",        duration: "2:31", mood: "calm",         url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
+      { id: "t2", title: "City Night Drive", artist: "Neon Waves",  album: "Highway Lights",    duration: "3:48", mood: "energetic",    url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
+      { id: "t3", title: "Study Rain",    artist: "Calm Rooms",   album: "Deep Concentration", duration: "4:12", mood: "calm",         url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" },
+      { id: "t4", title: "Soft Piano",    artist: "Silent Keys",  album: "Evening Notes",      duration: "3:05", mood: "instrumental", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" }
+    ];
+
+    var trackListEl = document.getElementById("trackList");
+    var audio = document.getElementById("audio");
+    var playerTitle = document.getElementById("playerTitle");
+    var playerArtist = document.getElementById("playerArtist");
+    var playerCover = document.getElementById("playerCover");
+    var playPauseBtn = document.getElementById("playPauseBtn");
+    var prevBtn = document.getElementById("prevBtn");
+    var nextBtn = document.getElementById("nextBtn");
+    var progressBar = document.getElementById("progressBar");
+    var progressInner = document.getElementById("progressInner");
+    var currentTimeEl = document.getElementById("currentTime");
+    var durationEl = document.getElementById("duration");
+    var volumeRange = document.getElementById("volumeRange");
+    var playerStatus = document.getElementById("playerStatus");
+    var headerUserEmail = document.getElementById("headerUserEmail");
+    var sidebarUserInfo = document.getElementById("sidebarUserInfo");
+    var navHome = document.getElementById("navHome");
+    var navMyMusic = document.getElementById("navMyMusic");
+    var navPlaylists = document.getElementById("navPlaylists");
+    var sectionTitle = document.getElementById("sectionTitle");
+    var sectionSub = document.getElementById("sectionSub");
+    var userTrackTitle = document.getElementById("userTrackTitle");
+    var userTrackArtist = document.getElementById("userTrackArtist");
+    var userTrackFile = document.getElementById("userTrackFile");
+    var adminPasswordInput = document.getElementById("adminPasswordInput");
+    var addTrackBtn = document.getElementById("addTrackBtn");
+
+    var currentIndex = 0;
+    var isPlaying = false;
+    var currentFilter = "all";
+    var filteredTracks = tracks.slice();
+    var currentTrackId = null;
+    var currentView = "home"; // home | my | playlists
+
+    function isDbTrack(track) {
+      return track && track.dbId;
+    }
+
+    function renderTracks(list) {
+      trackListEl.innerHTML = "";
+      for (var i = 0; i < list.length; i++) {
+        var track = list[i];
+        var row = document.createElement("div");
+        row.className = "track-row";
+        row.setAttribute("data-index", i);
+        row.setAttribute("data-id", track.id);
+        row.setAttribute("data-db-id", track.dbId || "");
+        row.innerHTML =
+          '<div class="track-index">' + (i + 1) + '</div>' +
+          '<div>' +
+            '<div class="track-title">' + track.title + '</div>' +
+            '<div class="track-artist">' + track.artist + '</div>' +
+          '</div>' +
+          '<div class="track-album">' + track.album + '</div>' +
+          '<div class="track-time">' + track.duration + '</div>';
+        row.onclick = (function(indexCopy) {
+          return function() {
+            loadTrack(indexCopy);
+            playTrack();
+          };
+        })(i);
+
+        // Если это трек из БД и владелец вошёл — добавляем быстрые кнопки редактирования/удаления
+        (function(rowCopy, trackCopy) {
+          rowCopy.oncontextmenu = function(e) {
+            e.preventDefault();
+            var user = getCurrentUserFull();
+            if (!user || user.email !== "zilajrik7@gmail.com" || !isDbTrack(trackCopy)) {
+              alert("Редактировать и удалять треки может только владелец, и только для треков из базы.");
+              return false;
+            }
+            var action = window.prompt("Введите действие: edit (редактировать) или delete (удалить)", "edit");
+            if (!action) return false;
+            if (action === "edit") {
+              var newTitle = window.prompt("Новое название трека", trackCopy.title);
+              if (!newTitle) return false;
+              var newArtist = window.prompt("Новый исполнитель", trackCopy.artist || "");
+              var adminPass = window.prompt("Admin‑пароль владельца для изменения трека");
+              if (!adminPass) { alert("Нужен admin‑пароль."); return false; }
+              fetch("/api/tracks/" + trackCopy.dbId, {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                  title: newTitle,
+                  artist: newArtist,
+                  adminPassword: adminPass
+                })
+              }).then(function(r){ return r.json(); }).then(function(resp){
+                if (resp && resp.error) {
+                  alert("Ошибка: " + resp.error);
+                } else {
+                  trackCopy.title = newTitle;
+                  trackCopy.artist = newArtist;
+                  updateFilter();
+                  alert("Трек обновлён.");
+                }
+              }).catch(function(){
+                alert("Ошибка сети при обновлении трека.");
+              });
+            } else if (action === "delete") {
+              if (!window.confirm("Точно удалить трек из базы?")) return false;
+              var adminPassDel = window.prompt("Admin‑пароль владельца для удаления трека");
+              if (!adminPassDel) { alert("Нужен admin‑пароль."); return false; }
+              fetch("/api/tracks/" + trackCopy.dbId, {
+                method: "DELETE",
+                headers: {
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ adminPassword: adminPassDel })
+              }).then(function(r){ return r.json(); }).then(function(resp){
+                if (resp && resp.error) {
+                  alert("Ошибка: " + resp.error);
+                } else {
+                  // удаляем трек из общего списка
+                  var idx = tracks.indexOf(trackCopy);
+                  if (idx !== -1) tracks.splice(idx, 1);
+                  updateFilter();
+                  alert("Трек удалён.");
+                }
+              }).catch(function(){
+                alert("Ошибка сети при удалении трека.");
+              });
+            }
+            return false;
+          };
+        })(row, track);
+
+        trackListEl.appendChild(row);
+      }
+      highlightActiveRow();
+    }
+
+    function highlightActiveRow() {
+      var rows = trackListEl.getElementsByClassName("track-row");
+      for (var i = 0; i < rows.length; i++) {
+        rows[i].classList.remove("active");
+      }
+      if (rows[currentIndex]) rows[currentIndex].classList.add("active");
+    }
+
+    function loadTrack(index) {
+      currentIndex = index;
+      var track = filteredTracks[currentIndex];
+      if (!track) return;
+      audio.src = track.url;
+      currentTrackId = track.id;
+      playerTitle.textContent = track.title;
+      playerArtist.textContent = track.artist;
+      playerCover.textContent = (track.title.charAt(0) || "T").toUpperCase();
+      highlightActiveRow();
+    }
+
+    function playTrack() {
+      if (!audio.src) loadTrack(currentIndex);
+      var playPromise = audio.play();
+      if (playPromise && playPromise.catch) {
+        playPromise.then(function() {
+          isPlaying = true;
+          playPauseBtn.textContent = "⏸";
+        }).catch(function() {
+          alert("Нажмите ещё раз для воспроизведения — браузер мог заблокировать автозвук.");
+        });
+      } else {
+        isPlaying = true;
+        playPauseBtn.textContent = "⏸";
+      }
+    }
+
+    function pauseTrack() {
+      audio.pause();
+      isPlaying = false;
+      playPauseBtn.textContent = "▶";
+    }
+
+    playPauseBtn.onclick = function() {
+      if (isPlaying) pauseTrack(); else playTrack();
+    };
+
+    prevBtn.onclick = function() {
+      if (!filteredTracks.length) return;
+      currentIndex = (currentIndex - 1 + filteredTracks.length) % filteredTracks.length;
+      loadTrack(currentIndex);
+      playTrack();
+    };
+
+    nextBtn.onclick = function() {
+      if (!filteredTracks.length) return;
+      currentIndex = (currentIndex + 1) % filteredTracks.length;
+      loadTrack(currentIndex);
+      playTrack();
+    };
+
+    audio.addEventListener("ended", function() {
+      if (!filteredTracks.length) return;
+      currentIndex = (currentIndex + 1) % filteredTracks.length;
+      loadTrack(currentIndex);
+      playTrack();
+    });
+
+    function formatTime(sec) {
+      if (isNaN(sec)) return "0:00";
+      var m = Math.floor(sec / 60);
+      var s = Math.floor(sec % 60);
+      if (s < 10) s = "0" + s;
+      return m + ":" + s;
+    }
+
+    audio.addEventListener("timeupdate", function() {
+      var currentTime = audio.currentTime;
+      var duration = audio.duration;
+      currentTimeEl.textContent = formatTime(currentTime);
+      durationEl.textContent = formatTime(duration);
+      var progress = duration ? (currentTime / duration) * 100 : 0;
+      progressInner.style.width = progress + "%";
+    });
+
+    progressBar.onclick = function(e) {
+      var rect = progressBar.getBoundingClientRect();
+      var ratio = (e.clientX - rect.left) / rect.width;
+      if (!isNaN(audio.duration)) {
+        if (ratio < 0) ratio = 0;
+        if (ratio > 1) ratio = 1;
+        audio.currentTime = audio.duration * ratio;
+      }
+    };
+
+    volumeRange.oninput = function() {
+      audio.volume = parseFloat(volumeRange.value);
+    };
+    audio.volume = parseFloat(volumeRange.value);
+
+    var searchInput = document.getElementById("searchInput");
+    searchInput.oninput = updateFilter;
+
+    var chipButtons = document.getElementsByClassName("chip");
+    for (var i = 0; i < chipButtons.length; i++) {
+      (function(chip) {
+        chip.onclick = function() {
+          for (var j = 0; j < chipButtons.length; j++) {
+            chipButtons[j].classList.remove("active");
+          }
+          chip.classList.add("active");
+          currentFilter = chip.getAttribute("data-filter") || "all";
+          updateFilter();
+        };
+      })(chipButtons[i]);
+    }
+
+    function updateFilter() {
+      var search = searchInput.value.toLowerCase();
+      filteredTracks = [];
+
+      // выбираем базовый список треков в зависимости от текущего раздела
+      var baseList = tracks;
+      var user = getCurrentUserFull();
+      if (currentView === "my" && user && user.likes && user.likes.length) {
+        baseList = [];
+        for (var i = 0; i < user.likes.length; i++) {
+          var likeId = user.likes[i];
+          for (var j = 0; j < tracks.length; j++) {
+            if (tracks[j].id === likeId) {
+              baseList.push(tracks[j]);
+              break;
+            }
+          }
+        }
+      } else if (currentView === "playlists" && user && user.playlists && user.playlists.length) {
+        baseList = [];
+        for (var p = 0; p < user.playlists.length; p++) {
+          var plId = user.playlists[p];
+          for (var k = 0; k < tracks.length; k++) {
+            if (tracks[k].id === plId) {
+              baseList.push(tracks[k]);
+              break;
+            }
+          }
+        }
+      }
+
+      for (var x = 0; x < baseList.length; x++) {
+        var t = baseList[x];
+        var matchText =
+          t.title.toLowerCase().indexOf(search) !== -1 ||
+          t.artist.toLowerCase().indexOf(search) !== -1;
+        var matchMood = currentFilter === "all" ? true : t.mood === currentFilter;
+        if (matchText && matchMood) filteredTracks.push(t);
+      }
+      if (!filteredTracks.length) {
+        var emptyText = "Ничего не найдено";
+        if (currentView === "my") {
+          emptyText = "Пока нет лайкнутых треков. Поставьте лайк, чтобы они появились здесь.";
+        } else if (currentView === "playlists") {
+          emptyText = "Ваш плейлист пуст. Добавьте треки кнопкой \"+ Добавить в плейлист\".";
+        }
+        trackListEl.innerHTML = '<div style="padding:10px;font-size:12px;color:#6b7280;">' + emptyText + '</div>';
+        return;
+      }
+
+      // подбираем индекс текущего трека, чтобы при переключении разделов музыка не останавливалась
+      if (currentTrackId) {
+        for (var y = 0; y < filteredTracks.length; y++) {
+          if (filteredTracks[y].id === currentTrackId) {
+            currentIndex = y;
+            break;
+          }
+        }
+      } else if (currentIndex >= filteredTracks.length) {
+        currentIndex = 0;
+      }
+
+      renderTracks(filteredTracks);
+    }
+
+    document.getElementById("addToPlaylistBtn").onclick = function() {
+      var user = getCurrentUserFull();
+      if (!user) {
+        alert("Чтобы сохранять плейлисты, сначала войдите или зарегистрируйтесь.");
+        return;
+      }
+      var track = filteredTracks[currentIndex];
+      if (!track) return;
+      if (!user.playlists) user.playlists = [];
+      if (user.playlists.indexOf(track.id) === -1) {
+        user.playlists.push(track.id);
+        saveUsers(users);
+        alert("Трек добавлен в ваш плейлист.");
+      } else {
+        alert("Этот трек уже в вашем плейлисте.");
+      }
+    };
+
+    document.getElementById("likeBtn").onclick = function() {
+      var user = getCurrentUserFull();
+      if (!user) {
+        alert("Чтобы ставить лайки, сначала войдите или зарегистрируйтесь.");
+        return;
+      }
+      var track = filteredTracks[currentIndex];
+      if (!track) return;
+      if (!user.likes) user.likes = [];
+      var idx = user.likes.indexOf(track.id);
+      if (idx === -1) {
+        user.likes.push(track.id);
+        saveUsers(users);
+        alert("Трек добавлен в ваши лайки.");
+      } else {
+        user.likes.splice(idx, 1);
+        saveUsers(users);
+        alert("Лайк снят.");
+      }
+    };
+
+    document.getElementById("shuffleBtn").onclick = function() {
+      if (!filteredTracks.length) return;
+      var rand = Math.floor(Math.random() * filteredTracks.length);
+      loadTrack(rand);
+      playTrack();
+    };
+
+    // Добавление собственного трека из файла (через сервер и БД)
+    addTrackBtn.onclick = function() {
+      var title = (userTrackTitle.value || "").trim();
+      var artist = (userTrackArtist.value || "").trim();
+      var file = userTrackFile.files[0];
+      var adminPass = (adminPasswordInput.value || "").trim();
+
+      var user = getCurrentUserFull();
+      if (!user || user.email !== "zilajrik7@gmail.com") {
+        alert("Добавлять треки может только владелец (email: zilajrik7@gmail.com).");
+        return;
+      }
+
+      if (!file) {
+        alert("Выберите аудио-файл.");
+        return;
+      }
+      if (!title) {
+        title = file.name;
+      }
+      if (!adminPass) {
+        alert("Введите admin‑пароль владельца для загрузки трека.");
+        return;
+      }
+
+      var formData = new FormData();
+      formData.append("title", title);
+      formData.append("artist", artist);
+      formData.append("file", file);
+      formData.append("adminPassword", adminPass);
+
+      fetch("/api/tracks/upload", {
+        method: "POST",
+        body: formData
+      }).then(function(r){ return r.json(); }).then(function(resp){
+        if (resp && resp.error) {
+          alert("Ошибка: " + resp.error);
+          return;
+        }
+        // добавляем трек в общий список (как трек из БД)
+        var newTrack = {
+          id: "db_" + resp.id,
+          dbId: resp.id,
+          title: resp.title,
+          artist: resp.artist || "Мой трек",
+          album: "Мои загрузки",
+          duration: "—:—",
+          mood: "calm",
+          url: resp.url
+        };
+        tracks.push(newTrack);
+        updateFilter();
+        alert("Трек загружен на сервер и сохранён в базе. Найдите его в списке и нажмите, чтобы воспроизвести.");
+        userTrackTitle.value = "";
+        userTrackArtist.value = "";
+        userTrackFile.value = "";
+      }).catch(function(){
+        alert("Ошибка сети при загрузке трека.");
+      });
+    };
+
+    var modalBackdrop = document.getElementById("modalBackdrop");
+    var modalTitle = document.getElementById("modalTitle");
+    var modalSub = document.getElementById("modalSub");
+    var modalSwitchText = document.getElementById("modalSwitchText");
+    var modalSwitchBtn = document.getElementById("modalSwitchBtn");
+    var authForm = document.getElementById("authForm");
+    var loginBtn = document.getElementById("loginBtn");
+    var registerBtn = document.getElementById("registerBtn");
+    var logoutBtn = document.getElementById("logoutBtn");
+    var modalClose = document.getElementById("modalClose");
+    var mode = "login";
+
+    function openModal(newMode) {
+      mode = newMode;
+      if (mode === "login") {
+        modalTitle.textContent = "Вход";
+        modalSub.textContent = "Авторизация через localStorage. Данные хранятся только в этом браузере.";
+        modalSwitchText.textContent = "Нет аккаунта?";
+        modalSwitchBtn.textContent = "Регистрация";
+      } else {
+        modalTitle.textContent = "Регистрация";
+        modalSub.textContent = "Создайте локальный аккаунт. Почта используется только для входа.";
+        modalSwitchText.textContent = "Уже есть аккаунт?";
+        modalSwitchBtn.textContent = "Войти";
+      }
+      modalBackdrop.style.display = "flex";
+    }
+    function closeModal() {
+      modalBackdrop.style.display = "none";
+    }
+
+    loginBtn.onclick = function() { openModal("login"); };
+    registerBtn.onclick = function() { openModal("register"); };
+    modalClose.onclick = closeModal;
+    modalBackdrop.onclick = function(e) {
+      if (e.target === modalBackdrop) closeModal();
+    };
+    modalSwitchBtn.onclick = function() {
+      openModal(mode === "login" ? "register" : "login");
+    };
+
+    authForm.onsubmit = function(e) {
+      e.preventDefault();
+      var email = document.getElementById("emailInput").value.replace(/\s+/g, "").toLowerCase();
+      var password = document.getElementById("passwordInput").value;
+      if (password.length < 4) {
+        alert("Пароль должен быть не короче 4 символов.");
+        return;
+      }
+
+      if (mode === "register") {
+        if (findUserByEmail(email)) {
+          alert("Пользователь с таким email уже существует. Попробуйте войти.");
+          return;
+        }
+        var newUser = { email: email, password: password, likes: [], playlists: [] };
+        users.push(newUser);
+        saveUsers(users);
+        currentUser = { email: email };
+        saveCurrentUser(currentUser);
+        alert("Аккаунт создан и вы вошли в систему.");
+      } else {
+        var user = findUserByEmail(email);
+        if (!user || user.password !== password) {
+          alert("Неверный email или пароль.");
+          return;
+        }
+        currentUser = { email: email };
+        saveCurrentUser(currentUser);
+        alert("Вы успешно вошли.");
+      }
+      closeModal();
+      updateAuthUI();
+    };
+
+    logoutBtn.onclick = function() {
+      currentUser = null;
+      saveCurrentUser(null);
+      updateAuthUI();
+      alert("Вы вышли из аккаунта.");
+    };
+
+    function updateAuthUI() {
+      var user = getCurrentUserFull();
+      var addPanel = document.querySelector(".add-track-panel");
+
+      if (user) {
+        headerUserEmail.textContent = user.email;
+        sidebarUserInfo.textContent = "Вы вошли как " + user.email;
+        playerStatus.textContent = "Вы вошли · лайки и плейлисты сохраняются в этом браузере";
+        loginBtn.style.display = "none";
+        registerBtn.style.display = "none";
+        logoutBtn.style.display = "inline-block";
+
+        // только владелец видит блок добавления трека
+        if (addPanel) {
+          addPanel.style.display = (user.email === "zilajrik7@gmail.com") ? "block" : "none";
+        }
+      } else {
+        headerUserEmail.textContent = "Гость";
+        sidebarUserInfo.textContent = "Гость · войдите, чтобы сохранять треки и плейлисты";
+        playerStatus.textContent = "Гость · данные хранятся локально при входе";
+        loginBtn.style.display = "inline-block";
+        registerBtn.style.display = "inline-block";
+        logoutBtn.style.display = "none";
+
+        if (addPanel) {
+          addPanel.style.display = "none";
+        }
+      }
+    }
+
+    // Переключение разделов в сайдбаре
+    function setActiveNav(view) {
+      currentView = view;
+      navHome.classList.remove("active");
+      navMyMusic.classList.remove("active");
+      navPlaylists.classList.remove("active");
+
+      if (view === "home") {
+        navHome.classList.add("active");
+        sectionTitle.textContent = "Плейлист дня";
+        sectionSub.textContent = "Рабочий плеер + регистрация через localStorage";
+      } else if (view === "my") {
+        navMyMusic.classList.add("active");
+        sectionTitle.textContent = "Моя музыка";
+        sectionSub.textContent = "Показываются треки, которым вы поставили лайк";
+      } else if (view === "playlists") {
+        navPlaylists.classList.add("active");
+        sectionTitle.textContent = "Мои плейлисты";
+        sectionSub.textContent = "Треки, добавленные кнопкой \"+ Добавить в плейлист\"";
+      }
+
+      updateFilter();
+    }
+
+    navHome.onclick = function() { setActiveNav("home"); };
+    navMyMusic.onclick = function() { setActiveNav("my"); };
+    navPlaylists.onclick = function() { setActiveNav("playlists"); };
+
+    function loadDbTracksAndInit() {
+      // Загружаем треки из базы и добавляем к локальному списку
+      fetch("/api/tracks")
+        .then(function(r){ return r.json(); })
+        .then(function(rows){
+          if (rows && rows.length) {
+            for (var i = 0; i < rows.length; i++) {
+              var row = rows[i];
+              tracks.push({
+                id: "db_" + row.id,
+                dbId: row.id,
+                title: row.title,
+                artist: row.artist || "Мой трек",
+                album: "Из базы",
+                duration: "—:—",
+                mood: "calm",
+                url: row.url
+              });
+            }
+          }
+          finishInit();
+        })
+        .catch(function(){
+          // если сервер недоступен, просто работаем с демо‑трекками
+          finishInit();
+        });
+    }
+
+    function finishInit() {
+      currentUser = loadCurrentUser();
+      updateAuthUI();
+      filteredTracks = tracks.slice();
+      renderTracks(filteredTracks);
+      loadTrack(0);
+      setActiveNav("home");
+    }
+
+    function init() {
+      loadDbTracksAndInit();
+    }
+
+    init();
+  </script>
+</body>
+</html>
