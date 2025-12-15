@@ -109,7 +109,10 @@ app.post('/api/login', (req, res) => {
 // Получение всех треков из БД
 app.get('/api/tracks', (req, res) => {
   db.all('SELECT id, title, artist, url FROM tracks ORDER BY id DESC', (err, rows) => {
-    if (err) return res.status(500).json({ error: 'Ошибка БД' });
+    if (err) {
+      console.error('DB error (GET /api/tracks):', err);
+      return res.status(500).json({ error: 'Ошибка БД: ' + err.message });
+    }
     res.json(rows);
   });
 });
@@ -123,7 +126,10 @@ app.post('/api/tracks', requireOwner, (req, res) => {
     'INSERT INTO tracks (owner_email, title, artist, url) VALUES (?,?,?,?)',
     [OWNER_EMAIL, title, artist || null, url],
     function (err) {
-      if (err) return res.status(500).json({ error: 'Ошибка БД' });
+      if (err) {
+        console.error('DB error (POST /api/tracks):', err);
+        return res.status(500).json({ error: 'Ошибка БД: ' + err.message });
+      }
       res.json({ id: this.lastID, title, artist, url });
     }
   );
@@ -158,7 +164,10 @@ app.post('/api/tracks/upload', upload.single('file'), (req, res) => {
     'INSERT INTO tracks (owner_email, title, artist, url) VALUES (?,?,?,?)',
     [OWNER_EMAIL, title, artist || null, relativeUrl],
     function (err) {
-      if (err) return res.status(500).json({ error: 'Ошибка БД' });
+      if (err) {
+        console.error('DB error (POST /api/tracks/upload):', err);
+        return res.status(500).json({ error: 'Ошибка БД: ' + err.message });
+      }
       res.json({ id: this.lastID, title, artist, url: relativeUrl });
     }
   );
@@ -177,7 +186,10 @@ app.put('/api/tracks/:id', requireOwner, (req, res) => {
     'UPDATE tracks SET title = ?, artist = ? WHERE id = ?',
     [title, artist || null, trackId],
     function (err) {
-      if (err) return res.status(500).json({ error: 'Ошибка БД' });
+      if (err) {
+        console.error('DB error (PUT /api/tracks/:id):', err);
+        return res.status(500).json({ error: 'Ошибка БД: ' + err.message });
+      }
       if (this.changes === 0) return res.status(404).json({ error: 'Трек не найден' });
       res.json({ id: trackId, title, artist });
     }
@@ -195,7 +207,10 @@ app.delete('/api/tracks/:id', requireOwner, (req, res) => {
     if (!row) return res.status(404).json({ error: 'Трек не найден' });
 
     db.run('DELETE FROM tracks WHERE id = ?', [trackId], function (err2) {
-      if (err2) return res.status(500).json({ error: 'Ошибка БД при удалении' });
+      if (err2) {
+        console.error('DB error (DELETE /api/tracks/:id):', err2);
+        return res.status(500).json({ error: 'Ошибка БД при удалении: ' + err2.message });
+      }
 
       // если трек указывал на локальный файл, попробуем удалить его
       if (row.url && row.url.indexOf('/uploads/') === 0) {
