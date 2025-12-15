@@ -60,24 +60,6 @@ db.serialize(() => {
     )
   `);
 
-  // Мягкая миграция: добавляем столбец owner_email, если его ещё нет
-  db.all(`PRAGMA table_info(tracks)`, (err, rows) => {
-    if (err) {
-      console.error('PRAGMA table_info(tracks) error:', err);
-      return;
-    }
-    const hasOwnerEmail = rows && rows.some((c) => c.name === 'owner_email');
-    if (!hasOwnerEmail) {
-      db.run(`ALTER TABLE tracks ADD COLUMN owner_email TEXT`, (alterErr) => {
-        if (alterErr) {
-          console.error('ALTER TABLE tracks ADD COLUMN owner_email error:', alterErr);
-        } else {
-          console.log('Column owner_email added to tracks table');
-        }
-      });
-    }
-  });
-
   // Если таблица tracks пуста — засеем демо-треки (которые раньше были в HTML)
   db.get('SELECT COUNT(*) AS cnt FROM tracks', (cntErr, row) => {
     if (cntErr) {
@@ -87,30 +69,14 @@ db.serialize(() => {
     if (row && row.cnt === 0) {
       console.log('Seeding demo tracks into DB...');
       const demoTracks = [
-        {
-          title: 'Lofi Morning',
-          artist: 'Beat Studio',
-          url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-        },
-        {
-          title: 'City Night Drive',
-          artist: 'Neon Waves',
-          url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-        },
-        {
-          title: 'Study Rain',
-          artist: 'Calm Rooms',
-          url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
-        },
-        {
-          title: 'Soft Piano',
-          artist: 'Silent Keys',
-          url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
-        },
+        { title: 'Lofi Morning', artist: 'Beat Studio', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
+        { title: 'City Night Drive', artist: 'Neon Waves', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3' },
+        { title: 'Study Rain', artist: 'Calm Rooms', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3' },
+        { title: 'Soft Piano', artist: 'Silent Keys', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3' },
       ];
-      const stmt = db.prepare('INSERT INTO tracks (owner_email, title, artist, url) VALUES (?,?,?,?)');
+      const stmt = db.prepare('INSERT INTO tracks (title, artist, url) VALUES (?,?,?)');
       demoTracks.forEach((t) => {
-        stmt.run([null, t.title, t.artist, t.url]);
+        stmt.run([t.title, t.artist, t.url]);
       });
       stmt.finalize();
     }
@@ -178,8 +144,8 @@ app.post('/api/tracks', requireOwner, (req, res) => {
   if (!title || !url) return res.status(400).json({ error: 'title и url обязательны' });
 
   db.run(
-    'INSERT INTO tracks (owner_email, title, artist, url) VALUES (?,?,?,?)',
-    [OWNER_EMAIL, title, artist || null, url],
+    'INSERT INTO tracks (title, artist, url) VALUES (?,?,?)',
+    [title, artist || null, url],
     function (err) {
       if (err) {
         console.error('DB error (POST /api/tracks):', err);
@@ -216,8 +182,8 @@ app.post('/api/tracks/upload', upload.single('file'), (req, res) => {
   const relativeUrl = '/uploads/' + req.file.filename;
 
   db.run(
-    'INSERT INTO tracks (owner_email, title, artist, url) VALUES (?,?,?,?)',
-    [OWNER_EMAIL, title, artist || null, relativeUrl],
+    'INSERT INTO tracks (title, artist, url) VALUES (?,?,?)',
+    [title, artist || null, relativeUrl],
     function (err) {
       if (err) {
         console.error('DB error (POST /api/tracks/upload):', err);
