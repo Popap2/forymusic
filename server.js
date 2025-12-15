@@ -207,32 +207,33 @@ app.post('/api/tracks/upload', upload.single('file'), async (req, res) => {
   if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
     try {
       const storagePath = SUPABASE_BUCKET + '/' + fileName;
-      const uploadUrl = SUPABASE_URL.replace(/\/+$/, '') + '/storage/v1/object/' + encodeURIComponent(storagePath);
+      const uploadUrl = SUPABASE_URL.replace(/\/+$/, '') + '/storage/v1/object/' + storagePath;
 
-      const fileStream = fs.createReadStream(localPath);
+      const fileBuffer = fs.readFileSync(localPath);
       const resp = await fetch(uploadUrl, {
         method: 'POST',
         headers: {
-          Authorization: 'Bearer ' + SUPABASE_SERVICE_KEY,
+          'Authorization': 'Bearer ' + SUPABASE_SERVICE_KEY,
           'Content-Type': req.file.mimetype || 'audio/mpeg',
+          'x-upsert': 'true',
         },
-        body: fileStream,
+        body: fileBuffer,
       });
 
       if (!resp.ok) {
         const text = await resp.text().catch(() => '');
         console.error('Supabase Storage upload error:', resp.status, text);
-        return res.status(500).json({ error: 'Не удалось загрузить файл в Supabase Storage' });
+        return res.status(500).json({ error: 'Не удалось загрузить файл в Supabase Storage: ' + text });
       }
 
       // Формируем публичный URL (для публичного bucket)
       finalUrl =
         SUPABASE_URL.replace(/\/+$/, '') +
         '/storage/v1/object/public/' +
-        encodeURIComponent(storagePath);
+        storagePath;
     } catch (e) {
       console.error('Supabase Storage exception:', e);
-      return res.status(500).json({ error: 'Ошибка при загрузке файла в Supabase Storage' });
+      return res.status(500).json({ error: 'Ошибка при загрузке файла в Supabase Storage: ' + e.message });
     } finally {
       // локальный временный файл больше не нужен
       fs.unlink(localPath, () => {});
