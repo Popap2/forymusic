@@ -58,9 +58,7 @@ async function initDb() {
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      likes JSONB DEFAULT '[]'::jsonb,
-      playlists JSONB DEFAULT '[]'::jsonb
+      password TEXT NOT NULL
     )
   `);
 
@@ -74,24 +72,9 @@ async function initDb() {
     )
   `);
 
-  // если таблица tracks пуста — засеем демо‑треки (которые раньше были в HTML)
-  const cntResult = await pool.query('SELECT COUNT(*) AS cnt FROM tracks');
-  const cnt = parseInt(cntResult.rows[0].cnt, 10) || 0;
-  if (cnt === 0) {
-    console.log('Seeding demo tracks into Postgres...');
-    const demoTracks = [
-      { title: 'Lofi Morning', artist: 'Beat Studio', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
-      { title: 'City Night Drive', artist: 'Neon Waves', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3' },
-      { title: 'Study Rain', artist: 'Calm Rooms', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3' },
-      { title: 'Soft Piano', artist: 'Silent Keys', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3' },
-    ];
-    for (const t of demoTracks) {
-      await pool.query(
-        'INSERT INTO tracks (title, artist, url) VALUES ($1,$2,$3)',
-        [t.title, t.artist, t.url]
-      );
-    }
-  }
+  // миграция: добавляем колонки likes, playlists если их нет
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS likes JSONB DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS playlists JSONB DEFAULT '[]'::jsonb`);
 }
 
 initDb().catch((err) => {
