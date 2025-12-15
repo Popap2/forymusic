@@ -77,6 +77,44 @@ db.serialize(() => {
       });
     }
   });
+
+  // Если таблица tracks пуста — засеем демо-треки (которые раньше были в HTML)
+  db.get('SELECT COUNT(*) AS cnt FROM tracks', (cntErr, row) => {
+    if (cntErr) {
+      console.error('COUNT(*) FROM tracks error:', cntErr);
+      return;
+    }
+    if (row && row.cnt === 0) {
+      console.log('Seeding demo tracks into DB...');
+      const demoTracks = [
+        {
+          title: 'Lofi Morning',
+          artist: 'Beat Studio',
+          url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+        },
+        {
+          title: 'City Night Drive',
+          artist: 'Neon Waves',
+          url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+        },
+        {
+          title: 'Study Rain',
+          artist: 'Calm Rooms',
+          url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+        },
+        {
+          title: 'Soft Piano',
+          artist: 'Silent Keys',
+          url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
+        },
+      ];
+      const stmt = db.prepare('INSERT INTO tracks (owner_email, title, artist, url) VALUES (?,?,?,?)');
+      demoTracks.forEach((t) => {
+        stmt.run([null, t.title, t.artist, t.url]);
+      });
+      stmt.finalize();
+    }
+  });
 });
 
 // ====== ВСПОМОГАТЕЛЬНАЯ ПРОВЕРКА ВЛАДЕЛЬЦА ======
