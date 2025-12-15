@@ -7,50 +7,30 @@ const multer = require('multer');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ====== ВЛАДЕЛЕЦ / ПРОСТАЯ ЗАЩИТА ======
-const OWNER_EMAIL = 'zilajrik7@gmail.com';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'dev-admin-password';
-
-// ====== ПОДКЛЮЧЕНИЕ К POSTGRES (SUPABASE) ======
+// ====== ПОДКЛЮЧЕНИЕ К PostgreSQL (внешняя БД, не пропадает на Render) ======
+// В Render и локально нужно задать переменную окружения DATABASE_URL
+// Например, строка подключения Supabase / Neon / Railway.
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
 });
 
-// инициализация схемы
-async function initDb() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id SERIAL PRIMARY KEY,
-      email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL
-    )
-  `);
+// ====== КОНФИГ ВЛАДЕЛЬЦА / ЛЁГКАЯ ЗАЩИТА ======
+// Email владельца, которому разрешено управлять треками
+const OWNER_EMAIL = 'zilajrik7@gmail.com';
+// Простой admin-пароль. На Render.com нужно задать переменную окружения ADMIN_PASSWORD.
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'dev-admin-password';
 
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS tracks (
-      id SERIAL PRIMARY KEY,
-      title TEXT NOT NULL,
-      artist TEXT,
-      url TEXT NOT NULL
-    )
-  `);
-}
-
-initDb().catch((err) => {
-  console.error('DB init error:', err);
-});
-
-// ====== MIDDLEWARE ======
+// чтобы читать JSON из fetch
 app.use(express.json());
 
-// папка для загруженных файлов
+// Папка для загруженных аудио-файлов
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Multer
+// Настройка Multer для загрузки файлов
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, uploadsDir);
@@ -63,11 +43,56 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// статика
+// раздаём статику и загруженные треки
 app.use(express.static(__dirname));
 app.use('/uploads', express.static(uploadsDir));
 
-// ====== ПРОВЕРКА ВЛАДЕЛЬЦА ======
+// ====== ИНИЦИАЛИЗАЦИЯ БД (PostgreSQL) ======
+async function initDb() {
+  // таблица пользователей
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL
+    )
+  `);
+
+  // таблица треков
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tracks (
+      id SERIAL PRIMARY KEY,
+      title TEXT NOT NULL,
+      artist TEXT,
+      url TEXT NOT NULL
+    )
+  `);
+
+  // если таблица tracks пуста — засеем демо‑треки (которые раньше были в HTML)
+  const cntResult = await pool.query('SELECT COUNT(*) AS cnt FROM tracks');
+  const cnt = parseInt(cntResult.rows[0].cnt, 10) || 0;
+  if (cnt === 0) {
+    console.log('Seeding demo tracks into Postgres...');
+    const demoTracks = [
+      { title: 'Lofi Morning', artist: 'Beat Studio', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
+      { title: 'City Night Drive', artist: 'Neon Waves', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3' },
+      { title: 'Study Rain', artist: 'Calm Rooms', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3' },
+      { title: 'Soft Piano', artist: 'Silent Keys', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3' },
+    ];
+    for (const t of demoTracks) {
+      await pool.query(
+        'INSERT INTO tracks (title, artist, url) VALUES ($1,$2,$3)',
+        [t.title, t.artist, t.url]
+      );
+    }
+  }
+}
+
+initDb().catch((err) => {
+  console.error('DB init error:', err);
+});
+
+// ====== ВСПОМОГАТЕЛЬНАЯ ПРОВЕРКА ВЛАДЕЛЬЦА ======
 function requireOwner(req, res, next) {
   const adminPassword = req.body.adminPassword || (req.headers['x-admin-password'] || '');
   if (!adminPassword || adminPassword !== ADMIN_PASSWORD) {
@@ -76,7 +101,7 @@ function requireOwner(req, res, next) {
   next();
 }
 
-// ====== API АККАУНТЫ (в Postgres) ======
+// ====== API АККАУНТЫ (PostgreSQL) ======
 app.post('/api/register', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'email и пароль обязательны' });
@@ -90,6 +115,7 @@ app.post('/api/register', async (req, res) => {
     res.json({ id: result.rows[0].id, email: lowered });
   } catch (err) {
     if (err.code === '23505') {
+      // unique_violation
       return res.status(409).json({ error: 'Пользователь уже существует' });
     }
     console.error('DB error (POST /api/register):', err);
@@ -108,16 +134,16 @@ app.post('/api/login', async (req, res) => {
     if (!result.rows[0]) {
       return res.status(401).json({ error: 'Неверный email или пароль' });
     }
-    res.json(result.rows[0]);
+    res.json(result.rows[0]); // {id, email}
   } catch (err) {
     console.error('DB error (POST /api/login):', err);
     res.status(500).json({ error: 'Ошибка БД: ' + err.message });
   }
 });
 
-// ====== API ТРЕКИ (Postgres) ======
+// ====== API ТРЕКИ (PostgreSQL) ======
 
-// Получение всех треков
+// Получение всех треков из БД
 app.get('/api/tracks', async (req, res) => {
   try {
     const result = await pool.query('SELECT id, title, artist, url FROM tracks ORDER BY id DESC');
@@ -128,7 +154,7 @@ app.get('/api/tracks', async (req, res) => {
   }
 });
 
-// Добавление трека по URL
+// Добавление трека по готовому URL (например, внешний ресурс) — только владелец
 app.post('/api/tracks', requireOwner, async (req, res) => {
   const { title, artist, url } = req.body;
   if (!title || !url) return res.status(400).json({ error: 'title и url обязательны' });
@@ -145,20 +171,28 @@ app.post('/api/tracks', requireOwner, async (req, res) => {
   }
 });
 
-// Загрузка файла и сохранение трека
+// Загрузка файла трека и сохранение в БД — только владелец
 app.post('/api/tracks/upload', upload.single('file'), async (req, res) => {
   const adminPassword = req.body.adminPassword;
   if (!adminPassword || adminPassword !== ADMIN_PASSWORD) {
+    // если файл уже был сохранён, удалим его при ошибке прав
     if (req.file) {
-      try { fs.unlinkSync(req.file.path); } catch (e) {}
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (e) {}
     }
     return res.status(403).json({ error: 'Нет прав. Неверный admin-пароль.' });
   }
 
   const title = (req.body.title || '').trim();
   const artist = (req.body.artist || '').trim();
-  if (!title) return res.status(400).json({ error: 'title обязателен' });
-  if (!req.file) return res.status(400).json({ error: 'Нужен audio-файл (поле file)' });
+
+  if (!title) {
+    return res.status(400).json({ error: 'title обязателен' });
+  }
+  if (!req.file) {
+    return res.status(400).json({ error: 'Нужен audio-файл (поле file)' });
+  }
 
   const relativeUrl = '/uploads/' + req.file.filename;
 
@@ -170,41 +204,49 @@ app.post('/api/tracks/upload', upload.single('file'), async (req, res) => {
     res.json({ id: result.rows[0].id, title, artist, url: relativeUrl });
   } catch (err) {
     console.error('DB error (POST /api/tracks/upload):', err);
-    res.status(500).json({ error: 'Ошибка БД: ' + err.message });
+    return res.status(500).json({ error: 'Ошибка БД: ' + err.message });
   }
 });
 
-// Обновление трека
+// Обновление метаданных трека — только владелец
 app.put('/api/tracks/:id', requireOwner, async (req, res) => {
   const trackId = parseInt(req.params.id, 10);
   const { title, artist } = req.body;
-  if (!trackId || !title) return res.status(400).json({ error: 'id и title обязательны' });
+
+  if (!trackId || !title) {
+    return res.status(400).json({ error: 'id и title обязательны' });
+  }
 
   try {
     const result = await pool.query(
       'UPDATE tracks SET title = $1, artist = $2 WHERE id = $3',
       [title, artist || null, trackId]
     );
-    if (result.rowCount === 0) return res.status(404).json({ error: 'Трек не найден' });
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Трек не найден' });
+    }
     res.json({ id: trackId, title, artist });
   } catch (err) {
     console.error('DB error (PUT /api/tracks/:id):', err);
-    res.status(500).json({ error: 'Ошибка БД: ' + err.message });
+    return res.status(500).json({ error: 'Ошибка БД: ' + err.message });
   }
 });
 
-// Удаление трека
+// Удаление трека — только владелец
 app.delete('/api/tracks/:id', requireOwner, async (req, res) => {
   const trackId = parseInt(req.params.id, 10);
   if (!trackId) return res.status(400).json({ error: 'id обязателен' });
 
   try {
-    const sel = await pool.query('SELECT url FROM tracks WHERE id = $1', [trackId]);
-    const row = sel.rows[0];
+    // сначала получаем трек, чтобы при необходимости удалить файл
+    const select = await pool.query('SELECT url FROM tracks WHERE id = $1', [trackId]);
+    const row = select.rows[0];
     if (!row) return res.status(404).json({ error: 'Трек не найден' });
 
     const del = await pool.query('DELETE FROM tracks WHERE id = $1', [trackId]);
-    if (del.rowCount === 0) return res.status(404).json({ error: 'Трек не найден' });
+    if (del.rowCount === 0) {
+      return res.status(404).json({ error: 'Трек не найден' });
+    }
 
     if (row.url && row.url.indexOf('/uploads/') === 0) {
       const filePath = path.join(__dirname, row.url.replace('/uploads/', 'uploads/'));
@@ -214,11 +256,11 @@ app.delete('/api/tracks/:id', requireOwner, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('DB error (DELETE /api/tracks/:id):', err);
-    res.status(500).json({ error: 'Ошибка БД при удалении: ' + err.message });
+    return res.status(500).json({ error: 'Ошибка БД при удалении: ' + err.message });
   }
 });
 
-// ====== FRONTEND ======
+// главная страница
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'Музыка 3.html'));
 });

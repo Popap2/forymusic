@@ -12,7 +12,9 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-  "express": "^5.2.1",
-  "multer": "^2.0.2",
-  "pg": "^8.11.3"
+    "express": "^5.2.1",
+    "pg": "^8.11.3",
+    "multer": "^2.0.2",
+    "sqlite3": "^5.1.7"
+  }
 }
