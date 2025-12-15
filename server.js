@@ -9,22 +9,27 @@ const PORT = process.env.PORT || 3000;
 
 // ====== ПОДКЛЮЧЕНИЕ К PostgreSQL (внешняя БД, не пропадает на Render) ======
 // В Render и локально нужно задать переменную окружения DATABASE_URL
-// Например, строка подключения Supabase / Neon / Railway.
+// Например, строка подключения Supabase / Neon.
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
 });
 
 // ====== КОНФИГ ВЛАДЕЛЬЦА / ЛЁГКАЯ ЗАЩИТА ======
-// Email владельца, которому разрешено управлять треками
 const OWNER_EMAIL = 'zilajrik7@gmail.com';
 // Простой admin-пароль. На Render.com нужно задать переменную окружения ADMIN_PASSWORD.
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'dev-admin-password';
 
+// ====== SUPABASE STORAGE (ДЛЯ MP3) ======
+// Эти переменные нужны, чтобы mp3-файлы хранились в Supabase и не пропадали при перезапуске.
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET || 'music';
+
 // чтобы читать JSON из fetch
 app.use(express.json());
 
-// Папка для загруженных аудио-файлов
+// Папка для временного хранения загруженных аудио-файлов (до отправки в Supabase)
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
@@ -43,9 +48,8 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// раздаём статику и загруженные треки
+// раздаём статику
 app.use(express.static(__dirname));
-app.use('/uploads', express.static(uploadsDir));
 
 // ====== ИНИЦИАЛИЗАЦИЯ БД (PostgreSQL) ======
 async function initDb() {
@@ -194,14 +198,53 @@ app.post('/api/tracks/upload', upload.single('file'), async (req, res) => {
     return res.status(400).json({ error: 'Нужен audio-файл (поле file)' });
   }
 
-  const relativeUrl = '/uploads/' + req.file.filename;
+  const localPath = req.file.path;
+  const fileName = req.file.filename;
+
+  // Если настроен Supabase Storage — загружаем файл туда и сохраняем публичный URL
+  let finalUrl = '/uploads/' + fileName; // запасной вариант, если Supabase не настроен
+
+  if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+    try {
+      const storagePath = SUPABASE_BUCKET + '/' + fileName;
+      const uploadUrl = SUPABASE_URL.replace(/\/+$/, '') + '/storage/v1/object/' + encodeURIComponent(storagePath);
+
+      const fileStream = fs.createReadStream(localPath);
+      const resp = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + SUPABASE_SERVICE_KEY,
+          'Content-Type': req.file.mimetype || 'audio/mpeg',
+        },
+        body: fileStream,
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text().catch(() => '');
+        console.error('Supabase Storage upload error:', resp.status, text);
+        return res.status(500).json({ error: 'Не удалось загрузить файл в Supabase Storage' });
+      }
+
+      // Формируем публичный URL (для публичного bucket)
+      finalUrl =
+        SUPABASE_URL.replace(/\/+$/, '') +
+        '/storage/v1/object/public/' +
+        encodeURIComponent(storagePath);
+    } catch (e) {
+      console.error('Supabase Storage exception:', e);
+      return res.status(500).json({ error: 'Ошибка при загрузке файла в Supabase Storage' });
+    } finally {
+      // локальный временный файл больше не нужен
+      fs.unlink(localPath, () => {});
+    }
+  }
 
   try {
     const result = await pool.query(
       'INSERT INTO tracks (title, artist, url) VALUES ($1,$2,$3) RETURNING id',
-      [title, artist || null, relativeUrl]
+      [title, artist || null, finalUrl]
     );
-    res.json({ id: result.rows[0].id, title, artist, url: relativeUrl });
+    res.json({ id: result.rows[0].id, title, artist, url: finalUrl });
   } catch (err) {
     console.error('DB error (POST /api/tracks/upload):', err);
     return res.status(500).json({ error: 'Ошибка БД: ' + err.message });
