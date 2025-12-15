@@ -210,12 +210,19 @@ app.post('/api/tracks/upload', upload.single('file'), async (req, res) => {
       const uploadUrl = SUPABASE_URL.replace(/\/+$/, '') + '/storage/v1/object/' + storagePath;
 
       const fileBuffer = fs.readFileSync(localPath);
+      
+      // Проверяем, что ключ начинается правильно (новый формат sb_secret_ или старый eyJ...)
+      if (!SUPABASE_SERVICE_KEY.startsWith('sb_secret_') && !SUPABASE_SERVICE_KEY.startsWith('eyJ')) {
+        console.error('SUPABASE_SERVICE_KEY format issue - should start with sb_secret_ or eyJ');
+      }
+
       const resp = await fetch(uploadUrl, {
         method: 'POST',
         headers: {
-          'Authorization': 'Bearer ' + SUPABASE_SERVICE_KEY,
+          'Authorization': 'Bearer ' + SUPABASE_SERVICE_KEY.trim(),
           'Content-Type': req.file.mimetype || 'audio/mpeg',
           'x-upsert': 'true',
+          'apikey': SUPABASE_SERVICE_KEY.trim(),
         },
         body: fileBuffer,
       });
@@ -223,6 +230,8 @@ app.post('/api/tracks/upload', upload.single('file'), async (req, res) => {
       if (!resp.ok) {
         const text = await resp.text().catch(() => '');
         console.error('Supabase Storage upload error:', resp.status, text);
+        console.error('Upload URL:', uploadUrl);
+        console.error('Key prefix:', SUPABASE_SERVICE_KEY.substring(0, 20) + '...');
         return res.status(500).json({ error: 'Не удалось загрузить файл в Supabase Storage: ' + text });
       }
 
