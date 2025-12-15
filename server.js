@@ -54,12 +54,29 @@ db.serialize(() => {
   db.run(`
     CREATE TABLE IF NOT EXISTS tracks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      owner_email TEXT,
       title TEXT NOT NULL,
       artist TEXT,
       url TEXT NOT NULL
     )
   `);
+
+  // Мягкая миграция: добавляем столбец owner_email, если его ещё нет
+  db.all(`PRAGMA table_info(tracks)`, (err, rows) => {
+    if (err) {
+      console.error('PRAGMA table_info(tracks) error:', err);
+      return;
+    }
+    const hasOwnerEmail = rows && rows.some((c) => c.name === 'owner_email');
+    if (!hasOwnerEmail) {
+      db.run(`ALTER TABLE tracks ADD COLUMN owner_email TEXT`, (alterErr) => {
+        if (alterErr) {
+          console.error('ALTER TABLE tracks ADD COLUMN owner_email error:', alterErr);
+        } else {
+          console.log('Column owner_email added to tracks table');
+        }
+      });
+    }
+  });
 });
 
 // ====== ВСПОМОГАТЕЛЬНАЯ ПРОВЕРКА ВЛАДЕЛЬЦА ======
