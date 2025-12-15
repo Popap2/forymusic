@@ -58,7 +58,9 @@ async function initDb() {
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL
+      password TEXT NOT NULL,
+      likes JSONB DEFAULT '[]'::jsonb,
+      playlists JSONB DEFAULT '[]'::jsonb
     )
   `);
 
@@ -113,10 +115,16 @@ app.post('/api/register', async (req, res) => {
   try {
     const lowered = email.toLowerCase();
     const result = await pool.query(
-      'INSERT INTO users (email, password) VALUES ($1,$2) RETURNING id',
-      [lowered, password]
+      'INSERT INTO users (email, password, likes, playlists) VALUES ($1,$2,$3::jsonb,$4::jsonb) RETURNING id, email, likes, playlists',
+      [lowered, password, JSON.stringify([]), JSON.stringify([])]
     );
-    res.json({ id: result.rows[0].id, email: lowered });
+    const user = result.rows[0];
+    res.json({
+      id: user.id,
+      email: user.email,
+      likes: user.likes || [],
+      playlists: user.playlists || []
+    });
   } catch (err) {
     if (err.code === '23505') {
       // unique_violation
@@ -132,15 +140,85 @@ app.post('/api/login', async (req, res) => {
   try {
     const lowered = email.toLowerCase();
     const result = await pool.query(
-      'SELECT id, email FROM users WHERE email = $1 AND password = $2',
+      'SELECT id, email, likes, playlists FROM users WHERE email = $1 AND password = $2',
       [lowered, password]
     );
     if (!result.rows[0]) {
       return res.status(401).json({ error: 'Неверный email или пароль' });
     }
-    res.json(result.rows[0]); // {id, email}
+    const user = result.rows[0];
+    res.json({
+      id: user.id,
+      email: user.email,
+      likes: user.likes || [],
+      playlists: user.playlists || []
+    });
   } catch (err) {
     console.error('DB error (POST /api/login):', err);
+    res.status(500).json({ error: 'Ошибка БД: ' + err.message });
+  }
+});
+
+// Получение данных пользователя по ID
+app.get('/api/user/:id', async (req, res) => {
+  const userId = parseInt(req.params.id, 10);
+  if (!userId) return res.status(400).json({ error: 'id обязателен' });
+
+  try {
+    const result = await pool.query(
+      'SELECT id, email, likes, playlists FROM users WHERE id = $1',
+      [userId]
+    );
+    if (!result.rows[0]) {
+      return res.status(404).json({ error: 'Пользователь не найден' });
+    }
+    const user = result.rows[0];
+    res.json({
+      id: user.id,
+      email: user.email,
+      likes: user.likes || [],
+      playlists: user.playlists || []
+    });
+  } catch (err) {
+    console.error('DB error (GET /api/user/:id):', err);
+    res.status(500).json({ error: 'Ошибка БД: ' + err.message });
+  }
+});
+
+// Обновление лайков пользователя
+app.put('/api/user/:id/likes', async (req, res) => {
+  const userId = parseInt(req.params.id, 10);
+  const { likes } = req.body;
+  if (!userId) return res.status(400).json({ error: 'id обязателен' });
+  if (!Array.isArray(likes)) return res.status(400).json({ error: 'likes должен быть массивом' });
+
+  try {
+    await pool.query(
+      'UPDATE users SET likes = $1::jsonb WHERE id = $2',
+      [JSON.stringify(likes), userId]
+    );
+    res.json({ success: true, likes });
+  } catch (err) {
+    console.error('DB error (PUT /api/user/:id/likes):', err);
+    res.status(500).json({ error: 'Ошибка БД: ' + err.message });
+  }
+});
+
+// Обновление плейлистов пользователя
+app.put('/api/user/:id/playlists', async (req, res) => {
+  const userId = parseInt(req.params.id, 10);
+  const { playlists } = req.body;
+  if (!userId) return res.status(400).json({ error: 'id обязателен' });
+  if (!Array.isArray(playlists)) return res.status(400).json({ error: 'playlists должен быть массивом' });
+
+  try {
+    await pool.query(
+      'UPDATE users SET playlists = $1::jsonb WHERE id = $2',
+      [JSON.stringify(playlists), userId]
+    );
+    res.json({ success: true, playlists });
+  } catch (err) {
+    console.error('DB error (PUT /api/user/:id/playlists):', err);
     res.status(500).json({ error: 'Ошибка БД: ' + err.message });
   }
 });

@@ -629,48 +629,65 @@
 
   <script>
     // ВЕСЬ JS — БЕЗ СОВРЕМЕННОГО СИНТАКСИСА
-    var STORAGE_USERS_KEY = "mw_users";
-    var STORAGE_CURRENT_USER_KEY = "mw_current_user";
+    var STORAGE_USER_ID_KEY = "mw_user_id";
 
-    function loadUsers() {
-      try {
-        var raw = localStorage.getItem(STORAGE_USERS_KEY);
-        return raw ? JSON.parse(raw) : [];
-      } catch (e) {
-        return [];
-      }
-    }
-    function saveUsers(users) {
-      localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users));
-    }
+    var currentUser = null; // {id, email, likes, playlists}
+
     function loadCurrentUser() {
       try {
-        var raw = localStorage.getItem(STORAGE_CURRENT_USER_KEY);
-        return raw ? JSON.parse(raw) : null;
+        var userIdStr = sessionStorage.getItem(STORAGE_USER_ID_KEY);
+        if (!userIdStr) return null;
+        var userId = parseInt(userIdStr, 10);
+        if (!userId) return null;
+        return { id: userId }; // временно, потом загрузим полные данные
       } catch (e) {
         return null;
       }
     }
     function saveCurrentUser(user) {
-      if (user) {
-        localStorage.setItem(STORAGE_CURRENT_USER_KEY, JSON.stringify({ email: user.email }));
+      if (user && user.id) {
+        sessionStorage.setItem(STORAGE_USER_ID_KEY, String(user.id));
       } else {
-        localStorage.removeItem(STORAGE_CURRENT_USER_KEY);
+        sessionStorage.removeItem(STORAGE_USER_ID_KEY);
       }
     }
 
-    var users = loadUsers();
-    var currentUser = null;
-
-    function findUserByEmail(email) {
-      for (var i = 0; i < users.length; i++) {
-        if (users[i].email === email) return users[i];
-      }
-      return null;
-    }
     function getCurrentUserFull() {
-      if (!currentUser) return null;
-      return findUserByEmail(currentUser.email);
+      return currentUser;
+    }
+
+    function loadUserData(userId) {
+      fetch("/api/user/" + userId)
+        .then(function(r){ return r.json(); })
+        .then(function(userData){
+          if (userData && userData.id) {
+            currentUser = userData;
+            updateAuthUI();
+          }
+        })
+        .catch(function(){
+          console.error("Failed to load user data");
+        });
+    }
+
+    function saveUserLikes(userId, likes) {
+      fetch("/api/user/" + userId + "/likes", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ likes: likes })
+      }).catch(function(){
+        console.error("Failed to save likes");
+      });
+    }
+
+    function saveUserPlaylists(userId, playlists) {
+      fetch("/api/user/" + userId + "/playlists", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playlists: playlists })
+      }).catch(function(){
+        console.error("Failed to save playlists");
+      });
     }
 
     // Все треки теперь живут в базе (SQLite), локальный список заполняется из /api/tracks
@@ -1002,7 +1019,7 @@
 
     document.getElementById("addToPlaylistBtn").onclick = function() {
       var user = getCurrentUserFull();
-      if (!user) {
+      if (!user || !user.id) {
         alert("Чтобы сохранять плейлисты, сначала войдите или зарегистрируйтесь.");
         return;
       }
@@ -1011,7 +1028,7 @@
       if (!user.playlists) user.playlists = [];
       if (user.playlists.indexOf(track.id) === -1) {
         user.playlists.push(track.id);
-        saveUsers(users);
+        saveUserPlaylists(user.id, user.playlists);
         alert("Трек добавлен в ваш плейлист.");
       } else {
         alert("Этот трек уже в вашем плейлисте.");
@@ -1020,7 +1037,7 @@
 
     document.getElementById("likeBtn").onclick = function() {
       var user = getCurrentUserFull();
-      if (!user) {
+      if (!user || !user.id) {
         alert("Чтобы ставить лайки, сначала войдите или зарегистрируйтесь.");
         return;
       }
@@ -1030,11 +1047,11 @@
       var idx = user.likes.indexOf(track.id);
       if (idx === -1) {
         user.likes.push(track.id);
-        saveUsers(users);
+        saveUserLikes(user.id, user.likes);
         alert("Трек добавлен в ваши лайки.");
       } else {
         user.likes.splice(idx, 1);
-        saveUsers(users);
+        saveUserLikes(user.id, user.likes);
         alert("Лайк снят.");
       }
     };
@@ -1128,12 +1145,12 @@
       mode = newMode;
       if (mode === "login") {
         modalTitle.textContent = "Вход";
-        modalSub.textContent = "Авторизация через localStorage. Данные хранятся только в этом браузере.";
+        modalSub.textContent = "Авторизация через сервер. Данные сохраняются в базе данных.";
         modalSwitchText.textContent = "Нет аккаунта?";
         modalSwitchBtn.textContent = "Регистрация";
       } else {
         modalTitle.textContent = "Регистрация";
-        modalSub.textContent = "Создайте локальный аккаунт. Почта используется только для входа.";
+        modalSub.textContent = "Создайте аккаунт. Данные сохраняются в базе данных.";
         modalSwitchText.textContent = "Уже есть аккаунт?";
         modalSwitchBtn.textContent = "Войти";
       }
@@ -1162,29 +1179,31 @@
         return;
       }
 
-      if (mode === "register") {
-        if (findUserByEmail(email)) {
-          alert("Пользователь с таким email уже существует. Попробуйте войти.");
+      var apiUrl = mode === "register" ? "/api/register" : "/api/login";
+      fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email, password: password })
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(resp){
+        if (resp && resp.error) {
+          alert("Ошибка: " + resp.error);
           return;
         }
-        var newUser = { email: email, password: password, likes: [], playlists: [] };
-        users.push(newUser);
-        saveUsers(users);
-        currentUser = { email: email };
-        saveCurrentUser(currentUser);
-        alert("Аккаунт создан и вы вошли в систему.");
-      } else {
-        var user = findUserByEmail(email);
-        if (!user || user.password !== password) {
-          alert("Неверный email или пароль.");
-          return;
+        if (mode === "register") {
+          alert("Аккаунт создан и вы вошли в систему.");
+        } else {
+          alert("Вы успешно вошли.");
         }
-        currentUser = { email: email };
+        currentUser = resp; // {id, email, likes, playlists}
         saveCurrentUser(currentUser);
-        alert("Вы успешно вошли.");
-      }
-      closeModal();
-      updateAuthUI();
+        closeModal();
+        updateAuthUI();
+      })
+      .catch(function(){
+        alert("Ошибка сети при " + (mode === "register" ? "регистрации" : "входе") + ".");
+      });
     };
 
     logoutBtn.onclick = function() {
@@ -1302,7 +1321,7 @@
       if (user) {
         headerUserEmail.textContent = user.email;
         sidebarUserInfo.textContent = "Вы вошли как " + user.email;
-        playerStatus.textContent = "Вы вошли · лайки и плейлисты сохраняются в этом браузере";
+        playerStatus.textContent = "Вы вошли · данные сохраняются в базе данных";
         loginBtn.style.display = "none";
         registerBtn.style.display = "none";
         logoutBtn.style.display = "inline-block";
@@ -1317,7 +1336,7 @@
       } else {
         headerUserEmail.textContent = "Гость";
         sidebarUserInfo.textContent = "Гость · войдите, чтобы сохранять треки и плейлисты";
-        playerStatus.textContent = "Гость · данные хранятся локально при входе";
+        playerStatus.textContent = "Гость · войдите, чтобы сохранять данные";
         loginBtn.style.display = "inline-block";
         registerBtn.style.display = "inline-block";
         logoutBtn.style.display = "none";
@@ -1388,8 +1407,13 @@
     }
 
     function finishInit() {
-      currentUser = loadCurrentUser();
-      updateAuthUI();
+      var savedUser = loadCurrentUser();
+      if (savedUser && savedUser.id) {
+        loadUserData(savedUser.id);
+      } else {
+        currentUser = null;
+        updateAuthUI();
+      }
       filteredTracks = tracks.slice();
       renderTracks(filteredTracks);
       loadTrack(0);
