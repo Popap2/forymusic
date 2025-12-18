@@ -3,6 +3,7 @@ const { Pool } = require('pg');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const bcrypt = require('bcrypt');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -97,9 +98,13 @@ app.post('/api/register', async (req, res) => {
 
   try {
     const lowered = email.toLowerCase();
+    // Хешируем пароль перед сохранением
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    
     const result = await pool.query(
       'INSERT INTO users (email, password, likes, playlists) VALUES ($1,$2,$3::jsonb,$4::jsonb) RETURNING id, email, likes, playlists',
-      [lowered, password, JSON.stringify([]), JSON.stringify([])]
+      [lowered, hashedPassword, JSON.stringify([]), JSON.stringify([])]
     );
     const user = result.rows[0];
     res.json({
@@ -122,14 +127,22 @@ app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   try {
     const lowered = email.toLowerCase();
+    // Получаем пользователя по email (включая хеш пароля)
     const result = await pool.query(
-      'SELECT id, email, likes, playlists FROM users WHERE email = $1 AND password = $2',
-      [lowered, password]
+      'SELECT id, email, password, likes, playlists FROM users WHERE email = $1',
+      [lowered]
     );
     if (!result.rows[0]) {
       return res.status(401).json({ error: 'Неверный email или пароль' });
     }
     const user = result.rows[0];
+    
+    // Сравниваем введённый пароль с хешем из базы
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    if (!passwordMatch) {
+      return res.status(401).json({ error: 'Неверный email или пароль' });
+    }
+    
     res.json({
       id: user.id,
       email: user.email,
