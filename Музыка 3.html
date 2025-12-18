@@ -462,6 +462,63 @@
 
     .playlist-list::-webkit-scrollbar { width: 4px; }
     .playlist-list::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 999px; }
+
+    /* Пасхалка для Евы - розовое модальное окно */
+    .easter-egg-modal {
+      width: 100%; max-width: 420px;
+      background: linear-gradient(135deg, #ff9ec8 0%, #ffb3d9 50%, #ffcce6 100%);
+      border-radius: 20px;
+      padding: 28px 24px;
+      border: 2px solid rgba(255, 182, 193, 0.8);
+      box-shadow: 0 20px 60px rgba(255, 105, 180, 0.4);
+      color: #8b1a4d;
+      text-align: center;
+      animation: heartPulse 2s ease-in-out infinite;
+    }
+    @keyframes heartPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+    }
+    .easter-egg-modal h2 {
+      font-size: 24px;
+      margin-bottom: 12px;
+      color: #c2185b;
+      text-shadow: 0 2px 4px rgba(255, 255, 255, 0.5);
+    }
+    .easter-egg-modal p {
+      font-size: 16px;
+      line-height: 1.6;
+      margin-bottom: 8px;
+      color: #8b1a4d;
+    }
+    .easter-egg-heart {
+      font-size: 48px;
+      margin: 12px 0;
+      animation: heartBeat 1.5s ease-in-out infinite;
+    }
+    @keyframes heartBeat {
+      0%, 100% { transform: scale(1); }
+      25% { transform: scale(1.15); }
+      50% { transform: scale(1); }
+    }
+    .easter-egg-close {
+      margin-top: 16px;
+      padding: 10px 24px;
+      background: #ff69b4;
+      color: white;
+      border: none;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(255, 105, 180, 0.3);
+    }
+    .easter-egg-close:hover {
+      background: #ff1493;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(255, 105, 180, 0.4);
+    }
   </style>
 </head>
 <body>
@@ -602,6 +659,18 @@
         <span id="modalSwitchText">Нет аккаунта?</span>
         <button id="modalSwitchBtn" type="button">Регистрация</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Пасхалка для Евы -->
+  <div class="modal-backdrop" id="easterEggBackdrop" style="display:none;z-index:30;">
+    <div class="modal easter-egg-modal">
+      <h2>💕 Для моей любимой Евы 💕</h2>
+      <div class="easter-egg-heart">💖</div>
+      <p style="font-weight:600;font-size:18px;">Ты самая особенная!</p>
+      <p>Каждый раз, когда ты заходишь сюда, я вспоминаю, как сильно тебя люблю.</p>
+      <p style="font-size:14px;margin-top:12px;opacity:0.9;">Это место создано с мыслями о тебе ❤️</p>
+      <button class="easter-egg-close" onclick="document.getElementById('easterEggBackdrop').style.display='none';">Закрыть</button>
     </div>
   </div>
 
@@ -1166,6 +1235,13 @@
     modalBackdrop.onclick = function(e) {
       if (e.target === modalBackdrop) closeModal();
     };
+    
+    // Закрытие пасхалки при клике на фон
+    document.getElementById("easterEggBackdrop").onclick = function(e) {
+      if (e.target === document.getElementById("easterEggBackdrop")) {
+        document.getElementById("easterEggBackdrop").style.display = "none";
+      }
+    };
     modalSwitchBtn.onclick = function() {
       openModal(mode === "login" ? "register" : "login");
     };
@@ -1191,11 +1267,18 @@
           alert("Ошибка: " + resp.error);
           return;
         }
-        if (mode === "register") {
-          alert("Аккаунт создан и вы вошли в систему.");
+        
+        // Пасхалка для Евы 💕
+        if (email === "ilove@you.com") {
+          document.getElementById("easterEggBackdrop").style.display = "flex";
         } else {
-          alert("Вы успешно вошли.");
+          if (mode === "register") {
+            alert("Аккаунт создан и вы вошли в систему.");
+          } else {
+            alert("Вы успешно вошли.");
+          }
         }
+        
         currentUser = resp; // {id, email, likes, playlists}
         saveCurrentUser(currentUser);
         closeModal();
