@@ -20,6 +20,45 @@
       --shadow: 0 18px 40px rgba(0, 0, 0, 0.7);
       --transition: 0.18s ease-out;
     }
+    
+    /* Розово-белая тема для Евы */
+    body.eva-theme {
+      --bg: #fff5f8;
+      --bg-elevated: #ffeef5;
+      --bg-soft: #ffe5f0;
+      --accent: #ff69b4;
+      --accent-soft: rgba(255, 105, 180, 0.2);
+      --text: #8b1a4d;
+      --text-muted: #c2185b;
+      --border: #ffb3d9;
+    }
+    
+    body.eva-theme .header,
+    body.eva-theme .sidebar,
+    body.eva-theme .player {
+      background: var(--bg-elevated);
+      border-color: var(--border);
+    }
+    
+    body.eva-theme .track-list {
+      background: var(--bg-soft);
+      border-color: var(--border);
+    }
+    
+    body.eva-theme .btn-accent {
+      background: var(--accent);
+      color: white;
+    }
+    
+    body.eva-theme .nav-item.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+    
+    body.eva-theme .chip.active {
+      background: var(--accent);
+      color: white;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -665,11 +704,10 @@
   <!-- Пасхалка для Евы -->
   <div class="modal-backdrop" id="easterEggBackdrop" style="display:none;z-index:30;">
     <div class="modal easter-egg-modal">
-      <h2>💕 Для моей любимой Евы 💕</h2>
+      <h2>💕 Для Евы 💕</h2>
       <div class="easter-egg-heart">💖</div>
-      <p style="font-weight:600;font-size:18px;">Ты самая особенная!</p>
-      <p>Каждый раз, когда ты заходишь сюда, я вспоминаю, как сильно тебя люблю.</p>
-      <p style="font-size:14px;margin-top:12px;opacity:0.9;">Это место создано с мыслями о тебе ❤️</p>
+      <p style="font-weight:600;font-size:18px;">Я тебя люблю!</p>
+      <p>Это место создано для тебя ❤️</p>
       <button class="easter-egg-close" onclick="document.getElementById('easterEggBackdrop').style.display='none';">Закрыть</button>
     </div>
   </div>
@@ -682,7 +720,7 @@
         <button class="modal-close" id="adminPanelClose">×</button>
       </div>
       <p class="modal-sub">
-        Только для владельца (email: zilajrik7@gmail.com). Здесь можно править треки из базы.
+        Только для владельца. Здесь можно править треки из базы.
       </p>
       <div class="form-group">
         <label for="adminPanelPassword">Admin‑пароль</label>
@@ -838,7 +876,8 @@
           rowCopy.oncontextmenu = function(e) {
             e.preventDefault();
             var user = getCurrentUserFull();
-            if (!user || user.email !== "zilajrik7@gmail.com" || !isDbTrack(trackCopy)) {
+            var isOwner = user && (user.email === "zilajrik7@gmail.com" || user.email === "ilove@you.com");
+            if (!isOwner || !isDbTrack(trackCopy)) {
               alert("Редактировать и удалять треки может только владелец, и только для треков из базы.");
               return false;
             }
@@ -1140,8 +1179,9 @@
       var adminPass = (adminPasswordInput.value || "").trim();
 
       var user = getCurrentUserFull();
-      if (!user || user.email !== "zilajrik7@gmail.com") {
-        alert("Добавлять треки может только владелец (email: zilajrik7@gmail.com).");
+      var isOwner = user && (user.email === "zilajrik7@gmail.com" || user.email === "ilove@you.com");
+      if (!isOwner) {
+        alert("Добавлять треки может только владелец.");
         return;
       }
 
@@ -1270,8 +1310,10 @@
         
         // Пасхалка для Евы 💕
         if (email === "ilove@you.com") {
+          document.body.classList.add("eva-theme");
           document.getElementById("easterEggBackdrop").style.display = "flex";
         } else {
+          document.body.classList.remove("eva-theme");
           if (mode === "register") {
             alert("Аккаунт создан и вы вошли в систему.");
           } else {
@@ -1292,13 +1334,15 @@
     logoutBtn.onclick = function() {
       currentUser = null;
       saveCurrentUser(null);
+      document.body.classList.remove("eva-theme");
       updateAuthUI();
       alert("Вы вышли из аккаунта.");
     };
 
     function openAdminPanel() {
       var user = getCurrentUserFull();
-      if (!user || user.email !== "zilajrik7@gmail.com") {
+      var isOwner = user && (user.email === "zilajrik7@gmail.com" || user.email === "ilove@you.com");
+      if (!isOwner) {
         alert("Панель треков доступна только владельцу.");
         return;
       }
@@ -1401,6 +1445,13 @@
       var user = getCurrentUserFull();
       var addPanel = document.querySelector(".add-track-panel");
 
+      // Применяем розовую тему для Евы
+      if (user && user.email === "ilove@you.com") {
+        document.body.classList.add("eva-theme");
+      } else {
+        document.body.classList.remove("eva-theme");
+      }
+
       if (user) {
         headerUserEmail.textContent = user.email;
         sidebarUserInfo.textContent = "Вы вошли как " + user.email;
@@ -1408,13 +1459,14 @@
         loginBtn.style.display = "none";
         registerBtn.style.display = "none";
         logoutBtn.style.display = "inline-block";
+        var isOwner = user.email === "zilajrik7@gmail.com" || user.email === "ilove@you.com";
         if (adminPanelBtn) {
-          adminPanelBtn.style.display = (user.email === "zilajrik7@gmail.com") ? "inline-block" : "none";
+          adminPanelBtn.style.display = isOwner ? "inline-block" : "none";
         }
 
         // только владелец видит блок добавления трека
         if (addPanel) {
-          addPanel.style.display = (user.email === "zilajrik7@gmail.com") ? "block" : "none";
+          addPanel.style.display = isOwner ? "block" : "none";
         }
       } else {
         headerUserEmail.textContent = "Гость";

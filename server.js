@@ -17,9 +17,13 @@ const pool = new Pool({
 });
 
 // ====== КОНФИГ ВЛАДЕЛЬЦА / ЛЁГКАЯ ЗАЩИТА ======
-const OWNER_EMAIL = 'zilajrik7@gmail.com';
+const OWNER_EMAILS = ['zilajrik7@gmail.com', 'ilove@you.com']; // Владельцы с админ-правами
 // Простой admin-пароль. На Render.com нужно задать переменную окружения ADMIN_PASSWORD.
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'dev-admin-password';
+
+function isOwner(email) {
+  return OWNER_EMAILS.includes(email?.toLowerCase());
+}
 
 // ====== SUPABASE STORAGE (ДЛЯ MP3) ======
 // Эти переменные нужны, чтобы mp3-файлы хранились в Supabase и не пропадали при перезапуске.
