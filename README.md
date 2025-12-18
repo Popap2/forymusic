@@ -20,46 +20,6 @@
 - **Хранилище файлов**: Supabase Storage
 - **Frontend**: Vanilla JavaScript, HTML5, CSS3
 
-## Локальный запуск
-
-### Требования
-
-- Node.js (версия 14 или выше)
-- npm или yarn
-- Аккаунт Supabase (для базы данных и хранилища)
-
-### Установка
-
-1. Клонируйте репозиторий или скачайте файлы проекта
-
-2. Установите зависимости:
-   ```bash
-   npm install
-   ```
-
-3. Создайте файл `.env` в корне проекта (опционально, для локальной разработки):
-   ```
-   DATABASE_URL=postgresql://postgres:ПАРОЛЬ@db-xxxx.supabase.co:5432/postgres
-   ADMIN_PASSWORD=ваш-секретный-пароль
-   SUPABASE_URL=https://xxxx.supabase.co
-   SUPABASE_SERVICE_KEY=ваш-service-role-ключ
-   SUPABASE_BUCKET=music
-   ```
-
-   **Важно**: Для локальной разработки можно использовать значения по умолчанию:
-   - `ADMIN_PASSWORD` по умолчанию: `dev-admin-password`
-   - Остальные переменные можно оставить пустыми, но тогда загрузка файлов в Supabase Storage работать не будет
-
-4. Запустите сервер:
-   ```bash
-   npm start
-   ```
-
-5. Откройте браузер и перейдите по адресу:
-   ```
-   http://localhost:3000
-   ```
-
 ### Настройка Supabase
 
 1. Создайте проект на [supabase.com](https://supabase.com)
