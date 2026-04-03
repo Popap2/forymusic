@@ -627,15 +627,15 @@
             <input id="userTrackTitle" class="form-input" type="text" placeholder="Название трека" />
             <input id="userTrackArtist" class="form-input" type="text" placeholder="Исполнитель (необязательно)" />
           </div>
-      <div class="add-track-row">
-        <input id="userTrackFile" class="form-input" type="file" accept="audio/*" />
+          <div class="add-track-row">
+            <input id="userTrackFile" class="form-input" type="file" accept="audio/*" />
         <input id="adminPasswordInput" class="form-input" type="password" placeholder="Admin‑пароль (только для владельца)" />
-        <button id="addTrackBtn" class="btn-accent" style="white-space:nowrap;">Добавить трек</button>
-      </div>
-      <div class="add-track-hint">
+            <button id="addTrackBtn" class="btn-accent" style="white-space:nowrap;">Добавить трек</button>
+          </div>
+          <div class="add-track-hint">
         Файл загружается на сервер и сохраняется в базе данных. 
         Управлять треками может только владелец (по admin‑паролю).
-      </div>
+          </div>
         </div>
       </section>
     </main>
@@ -770,7 +770,7 @@
           if (userData && userData.id) {
             currentUser = userData;
             updateAuthUI();
-          }
+    }
         })
         .catch(function(){
           console.error("Failed to load user data");
@@ -1212,22 +1212,22 @@
           return;
         }
         // добавляем трек в общий список (как трек из БД)
-        var newTrack = {
+      var newTrack = {
           id: "db_" + resp.id,
           dbId: resp.id,
           title: resp.title,
           artist: resp.artist || "Мой трек",
           album: "Мои загрузки",
-          duration: "—:—",
-          mood: "calm",
+        duration: "—:—",
+        mood: "calm",
           url: resp.url
-        };
-        tracks.push(newTrack);
-        updateFilter();
+      };
+      tracks.push(newTrack);
+      updateFilter();
         alert("Трек загружен на сервер и сохранён в базе. Найдите его в списке и нажмите, чтобы воспроизвести.");
-        userTrackTitle.value = "";
-        userTrackArtist.value = "";
-        userTrackFile.value = "";
+      userTrackTitle.value = "";
+      userTrackArtist.value = "";
+      userTrackFile.value = "";
       }).catch(function(){
         alert("Ошибка сети при загрузке трека.");
       });
@@ -1315,16 +1315,16 @@
         } else {
           document.body.classList.remove("eva-theme");
           if (mode === "register") {
-            alert("Аккаунт создан и вы вошли в систему.");
-          } else {
-            alert("Вы успешно вошли.");
-          }
+        alert("Аккаунт создан и вы вошли в систему.");
+      } else {
+        alert("Вы успешно вошли.");
+      }
         }
         
         currentUser = resp; // {id, email, likes, playlists}
         saveCurrentUser(currentUser);
-        closeModal();
-        updateAuthUI();
+      closeModal();
+      updateAuthUI();
       })
       .catch(function(){
         alert("Ошибка сети при " + (mode === "register" ? "регистрации" : "входе") + ".");
@@ -1547,7 +1547,7 @@
         loadUserData(savedUser.id);
       } else {
         currentUser = null;
-        updateAuthUI();
+      updateAuthUI();
       }
       filteredTracks = tracks.slice();
       renderTracks(filteredTracks);

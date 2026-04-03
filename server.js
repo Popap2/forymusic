@@ -1,6 +1,12 @@
 const express = require('express');
+const dns = require('dns');
 const { Pool } = require('pg');
 const path = require('path');
+
+// Render и часть хостингов не маршрутизируют IPv6 к Supabase; иначе: connect ENETUNREACH
+if (typeof dns.setDefaultResultOrder === 'function') {
+  dns.setDefaultResultOrder('ipv4first');
+}
 const fs = require('fs');
 const multer = require('multer');
 const bcrypt = require('bcrypt');
@@ -120,11 +126,11 @@ app.post('/api/register', async (req, res) => {
   } catch (err) {
     if (err.code === '23505') {
       // unique_violation
-      return res.status(409).json({ error: 'Пользователь уже существует' });
-    }
+          return res.status(409).json({ error: 'Пользователь уже существует' });
+        }
     console.error('DB error (POST /api/register):', err);
     res.status(500).json({ error: 'Ошибка БД: ' + err.message });
-  }
+    }
 });
 
 app.post('/api/login', async (req, res) => {
