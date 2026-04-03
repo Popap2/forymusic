@@ -54,10 +54,28 @@ const storage = multer.diskStorage({
   filename: function (req, file, cb) {
     const ext = path.extname(file.originalname) || '.mp3';
     const base = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_\-]/g, '_');
-    cb(null, Date.now() + '_' + base + ext);
+    const unique = Date.now() + '_' + Math.random().toString(36).slice(2, 11);
+    cb(null, unique + '_' + base + ext);
   },
 });
 const upload = multer({ storage });
+const uploadTracksFields = upload.fields([
+  { name: 'files', maxCount: 100 },
+  { name: 'file', maxCount: 1 },
+]);
+
+function titleFromAudioOriginalName(originalname) {
+  if (!originalname || typeof originalname !== 'string') return 'Без названия';
+  const ext = path.extname(originalname);
+  let base = path.basename(originalname, ext);
+  try {
+    base = decodeURIComponent(base);
+  } catch (e) {
+    /* ignore */
+  }
+  base = base.replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return base || 'Без названия';
+}
 
 // раздаём статику
 app.use(express.static(__dirname));
@@ -259,90 +277,102 @@ app.post('/api/tracks', requireOwner, async (req, res) => {
   }
 });
 
-// Загрузка файла трека и сохранение в БД — только владелец
-app.post('/api/tracks/upload', upload.single('file'), async (req, res) => {
+// Загрузка одного или нескольких файлов; название по умолчанию — из имени файла (без расширения)
+app.post('/api/tracks/upload', uploadTracksFields, async (req, res) => {
+  const fileList = [];
+  if (req.files?.files) fileList.push(...req.files.files);
+  if (req.files?.file) fileList.push(...req.files.file);
+
   const adminPassword = req.body.adminPassword;
   if (!adminPassword || adminPassword !== ADMIN_PASSWORD) {
-    // если файл уже был сохранён, удалим его при ошибке прав
-    if (req.file) {
+    for (const f of fileList) {
       try {
-        fs.unlinkSync(req.file.path);
+        fs.unlinkSync(f.path);
       } catch (e) {}
     }
     return res.status(403).json({ error: 'Нет прав. Неверный admin-пароль.' });
   }
 
-  const title = (req.body.title || '').trim();
-  const artist = (req.body.artist || '').trim();
-
-  if (!title) {
-    return res.status(400).json({ error: 'title обязателен' });
-  }
-  if (!req.file) {
-    return res.status(400).json({ error: 'Нужен audio-файл (поле file)' });
+  if (!fileList.length) {
+    return res.status(400).json({ error: 'Нужен хотя бы один audio-файл (поля files или file)' });
   }
 
-  const localPath = req.file.path;
-  const fileName = req.file.filename;
+  const artist = (req.body.artist || '').trim() || null;
+  const singleTitleOverride = (req.body.title || '').trim();
+  const added = [];
+  const errors = [];
 
-  // Если настроен Supabase Storage — загружаем файл туда и сохраняем публичный URL
-  let finalUrl = '/uploads/' + fileName; // запасной вариант, если Supabase не настроен
+  for (const file of fileList) {
+    const title =
+      fileList.length === 1 && singleTitleOverride
+        ? singleTitleOverride
+        : titleFromAudioOriginalName(file.originalname);
 
-  if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+    const localPath = file.path;
+    const fileName = file.filename;
+    let finalUrl = '/uploads/' + fileName;
+
     try {
-      const storagePath = SUPABASE_BUCKET + '/' + fileName;
-      const uploadUrl = SUPABASE_URL.replace(/\/+$/, '') + '/storage/v1/object/' + storagePath;
+      if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+        try {
+          const storagePath = SUPABASE_BUCKET + '/' + fileName;
+          const uploadUrl = SUPABASE_URL.replace(/\/+$/, '') + '/storage/v1/object/' + storagePath;
 
-      const fileBuffer = fs.readFileSync(localPath);
-      
-      // Проверяем, что ключ начинается правильно (новый формат sb_secret_ или старый eyJ...)
-      if (!SUPABASE_SERVICE_KEY.startsWith('sb_secret_') && !SUPABASE_SERVICE_KEY.startsWith('eyJ')) {
-        console.error('SUPABASE_SERVICE_KEY format issue - should start with sb_secret_ or eyJ');
+          const fileBuffer = fs.readFileSync(localPath);
+
+          if (!SUPABASE_SERVICE_KEY.startsWith('sb_secret_') && !SUPABASE_SERVICE_KEY.startsWith('eyJ')) {
+            console.error('SUPABASE_SERVICE_KEY format issue - should start with sb_secret_ or eyJ');
+          }
+
+          const resp = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: {
+              Authorization: 'Bearer ' + SUPABASE_SERVICE_KEY.trim(),
+              'Content-Type': file.mimetype || 'audio/mpeg',
+              'x-upsert': 'true',
+              apikey: SUPABASE_SERVICE_KEY.trim(),
+            },
+            body: fileBuffer,
+          });
+
+          if (!resp.ok) {
+            const text = await resp.text().catch(() => '');
+            console.error('Supabase Storage upload error:', resp.status, text);
+            throw new Error('Supabase Storage: ' + text);
+          }
+
+          finalUrl =
+            SUPABASE_URL.replace(/\/+$/, '') + '/storage/v1/object/public/' + storagePath;
+        } finally {
+          fs.unlink(localPath, () => {});
+        }
       }
 
-      const resp = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + SUPABASE_SERVICE_KEY.trim(),
-          'Content-Type': req.file.mimetype || 'audio/mpeg',
-          'x-upsert': 'true',
-          'apikey': SUPABASE_SERVICE_KEY.trim(),
-        },
-        body: fileBuffer,
+      const result = await pool.query(
+        'INSERT INTO tracks (title, artist, url) VALUES ($1,$2,$3) RETURNING id',
+        [title, artist, finalUrl]
+      );
+      added.push({
+        id: result.rows[0].id,
+        title,
+        artist,
+        url: finalUrl,
       });
-
-      if (!resp.ok) {
-        const text = await resp.text().catch(() => '');
-        console.error('Supabase Storage upload error:', resp.status, text);
-        console.error('Upload URL:', uploadUrl);
-        console.error('Key prefix:', SUPABASE_SERVICE_KEY.substring(0, 20) + '...');
-        return res.status(500).json({ error: 'Не удалось загрузить файл в Supabase Storage: ' + text });
-      }
-
-      // Формируем публичный URL (для публичного bucket)
-      finalUrl =
-        SUPABASE_URL.replace(/\/+$/, '') +
-        '/storage/v1/object/public/' +
-        storagePath;
-    } catch (e) {
-      console.error('Supabase Storage exception:', e);
-      return res.status(500).json({ error: 'Ошибка при загрузке файла в Supabase Storage: ' + e.message });
-    } finally {
-      // локальный временный файл больше не нужен
-      fs.unlink(localPath, () => {});
+    } catch (err) {
+      console.error('POST /api/tracks/upload file error:', file.originalname, err);
+      errors.push({ file: file.originalname, error: err.message });
+      try {
+        if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+      } catch (e) {}
     }
   }
 
-  try {
-    const result = await pool.query(
-      'INSERT INTO tracks (title, artist, url) VALUES ($1,$2,$3) RETURNING id',
-      [title, artist || null, finalUrl]
-    );
-    res.json({ id: result.rows[0].id, title, artist, url: finalUrl });
-  } catch (err) {
-    console.error('DB error (POST /api/tracks/upload):', err);
-    return res.status(500).json({ error: 'Ошибка БД: ' + err.message });
+  if (!added.length) {
+    const msg = errors[0]?.error || 'Не удалось загрузить файлы';
+    return res.status(500).json({ error: msg, errors, tracks: [] });
   }
+
+  res.json({ tracks: added, errors });
 });
 
 // Обновление метаданных трека — только владелец

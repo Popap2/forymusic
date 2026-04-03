@@ -624,17 +624,17 @@
         <div class="add-track-panel">
           <div class="add-track-title">Добавить свой трек</div>
           <div class="add-track-row">
-            <input id="userTrackTitle" class="form-input" type="text" placeholder="Название трека" />
-            <input id="userTrackArtist" class="form-input" type="text" placeholder="Исполнитель (необязательно)" />
+            <input id="userTrackTitle" class="form-input" type="text" placeholder="Название (только если 1 файл; иначе из имени файла)" />
+            <input id="userTrackArtist" class="form-input" type="text" placeholder="Исполнитель для всех (необязательно)" />
           </div>
           <div class="add-track-row">
-            <input id="userTrackFile" class="form-input" type="file" accept="audio/*" />
+            <input id="userTrackFile" class="form-input" type="file" accept="audio/*" multiple />
         <input id="adminPasswordInput" class="form-input" type="password" placeholder="Admin‑пароль (только для владельца)" />
-            <button id="addTrackBtn" class="btn-accent" style="white-space:nowrap;">Добавить трек</button>
+            <button id="addTrackBtn" class="btn-accent" style="white-space:nowrap;">Добавить треки</button>
           </div>
           <div class="add-track-hint">
-        Файл загружается на сервер и сохраняется в базе данных. 
-        Управлять треками может только владелец (по admin‑паролю).
+        Можно выбрать несколько файлов сразу: имя трека берётся из имени файла (без .mp3 и т.п.).
+        Файлы загружаются на сервер и сохраняются в базе. Управлять треками может только владелец (по admin‑паролю).
           </div>
         </div>
       </section>
@@ -1171,11 +1171,11 @@
       playTrack();
     };
 
-    // Добавление собственного трека из файла (через сервер и БД)
+    // Добавление своих треков из файлов (пачка или один; название из имени файла)
     addTrackBtn.onclick = function() {
-      var title = (userTrackTitle.value || "").trim();
+      var titleOpt = (userTrackTitle.value || "").trim();
       var artist = (userTrackArtist.value || "").trim();
-      var file = userTrackFile.files[0];
+      var files = userTrackFile.files;
       var adminPass = (adminPasswordInput.value || "").trim();
 
       var user = getCurrentUserFull();
@@ -1185,12 +1185,9 @@
         return;
       }
 
-      if (!file) {
-        alert("Выберите аудио-файл.");
+      if (!files || !files.length) {
+        alert("Выберите хотя бы один аудио-файл.");
         return;
-      }
-      if (!title) {
-        title = file.name;
       }
       if (!adminPass) {
         alert("Введите admin‑пароль владельца для загрузки трека.");
@@ -1198,36 +1195,48 @@
       }
 
       var formData = new FormData();
-      formData.append("title", title);
-      formData.append("artist", artist);
-      formData.append("file", file);
+      if (files.length === 1 && titleOpt) {
+        formData.append("title", titleOpt);
+      }
+      if (artist) {
+        formData.append("artist", artist);
+      }
+      for (var fi = 0; fi < files.length; fi++) {
+        formData.append("files", files[fi]);
+      }
       formData.append("adminPassword", adminPass);
 
       fetch("/api/tracks/upload", {
         method: "POST",
         body: formData
       }).then(function(r){ return r.json(); }).then(function(resp){
-        if (resp && resp.error) {
+        if (resp && resp.error && (!resp.tracks || !resp.tracks.length)) {
           alert("Ошибка: " + resp.error);
           return;
         }
-        // добавляем трек в общий список (как трек из БД)
-      var newTrack = {
-          id: "db_" + resp.id,
-          dbId: resp.id,
-          title: resp.title,
-          artist: resp.artist || "Мой трек",
-          album: "Мои загрузки",
-        duration: "—:—",
-        mood: "calm",
-          url: resp.url
-      };
-      tracks.push(newTrack);
-      updateFilter();
-        alert("Трек загружен на сервер и сохранён в базе. Найдите его в списке и нажмите, чтобы воспроизвести.");
-      userTrackTitle.value = "";
-      userTrackArtist.value = "";
-      userTrackFile.value = "";
+        var list = resp.tracks || [];
+        for (var j = 0; j < list.length; j++) {
+          var t = list[j];
+          tracks.push({
+            id: "db_" + t.id,
+            dbId: t.id,
+            title: t.title,
+            artist: t.artist || "Мой трек",
+            album: "Мои загрузки",
+            duration: "—:—",
+            mood: "calm",
+            url: t.url
+          });
+        }
+        updateFilter();
+        var msg = list.length ? ("Загружено треков: " + list.length + ". Они в списке — нажмите, чтобы воспроизвести.") : "";
+        if (resp.errors && resp.errors.length) {
+          msg += (msg ? "\n" : "") + "Ошибки: " + resp.errors.map(function(e){ return (e.file || "") + ": " + (e.error || ""); }).join("; ");
+        }
+        alert(msg || "Готово.");
+        userTrackTitle.value = "";
+        userTrackArtist.value = "";
+        userTrackFile.value = "";
       }).catch(function(){
         alert("Ошибка сети при загрузке трека.");
       });
