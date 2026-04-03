@@ -609,7 +609,7 @@
         <div class="section-header">
           <div>
             <div id="sectionTitle" class="section-title">Плейлист дня</div>
-            <div id="sectionSub" class="section-sub">Рабочий плеер + регистрация через localStorage</div>
+            <div id="sectionSub" class="section-sub">Рабочий плеер + автовход через cookie</div>
           </div>
           <div class="section-link" id="shuffleBtn">Перемешать</div>
         </div>
@@ -681,7 +681,7 @@
         <button class="modal-close" id="modalClose">×</button>
       </div>
       <p class="modal-sub" id="modalSub">
-        Данные сохраняются только в этом браузере (localStorage), без сервера.
+        После входа id сессии хранится в cookie (автовход ~30 дней в этом браузере).
       </p>
       <form id="authForm">
         <div class="form-group">
@@ -736,27 +736,63 @@
 
   <script>
     // ВЕСЬ JS — БЕЗ СОВРЕМЕННОГО СИНТАКСИСА
-    var STORAGE_USER_ID_KEY = "mw_user_id";
+    var COOKIE_USER_ID = "mw_user_id";
+    var COOKIE_MAX_AGE_SEC = 60 * 60 * 24 * 30; // 30 дней
 
     var currentUser = null; // {id, email, likes, playlists}
 
+    function readUserIdCookie() {
+      var prefix = COOKIE_USER_ID + "=";
+      var chunks = document.cookie.split(";");
+      for (var i = 0; i < chunks.length; i++) {
+        var part = chunks[i].replace(/^\s+/, "");
+        if (part.indexOf(prefix) === 0) {
+          var raw = decodeURIComponent(part.slice(prefix.length));
+          var uid = parseInt(raw, 10);
+          return uid || null;
+        }
+      }
+      return null;
+    }
+
+    function writeUserIdCookie(userId) {
+      var secure = location.protocol === "https:" ? "; Secure" : "";
+      if (userId) {
+        document.cookie =
+          COOKIE_USER_ID +
+          "=" +
+          encodeURIComponent(String(userId)) +
+          "; path=/; max-age=" +
+          COOKIE_MAX_AGE_SEC +
+          "; SameSite=Lax" +
+          secure;
+      } else {
+        document.cookie = COOKIE_USER_ID + "=; path=/; max-age=0; SameSite=Lax" + secure;
+      }
+    }
+
     function loadCurrentUser() {
       try {
-        var userIdStr = sessionStorage.getItem(STORAGE_USER_ID_KEY);
-        if (!userIdStr) return null;
-        var userId = parseInt(userIdStr, 10);
+        var userId = readUserIdCookie();
+        if (!userId && typeof sessionStorage !== "undefined") {
+          var legacy = sessionStorage.getItem("mw_user_id");
+          if (legacy) {
+            userId = parseInt(legacy, 10) || null;
+            if (userId) {
+              writeUserIdCookie(userId);
+              sessionStorage.removeItem("mw_user_id");
+            }
+          }
+        }
         if (!userId) return null;
-        return { id: userId }; // временно, потом загрузим полные данные
+        return { id: userId };
       } catch (e) {
         return null;
       }
     }
+
     function saveCurrentUser(user) {
-      if (user && user.id) {
-        sessionStorage.setItem(STORAGE_USER_ID_KEY, String(user.id));
-      } else {
-        sessionStorage.removeItem(STORAGE_USER_ID_KEY);
-      }
+      writeUserIdCookie(user && user.id ? user.id : null);
     }
 
     function getCurrentUserFull() {
@@ -765,15 +801,31 @@
 
     function loadUserData(userId) {
       fetch("/api/user/" + userId)
-        .then(function(r){ return r.json(); })
+        .then(function(r){
+          if (!r.ok) {
+            currentUser = null;
+            saveCurrentUser(null);
+            updateAuthUI();
+            return null;
+          }
+          return r.json();
+        })
         .then(function(userData){
-          if (userData && userData.id) {
+          if (!userData) return;
+          if (userData.id) {
             currentUser = userData;
             updateAuthUI();
-    }
+          } else {
+            currentUser = null;
+            saveCurrentUser(null);
+            updateAuthUI();
+          }
         })
         .catch(function(){
           console.error("Failed to load user data");
+          currentUser = null;
+          saveCurrentUser(null);
+          updateAuthUI();
         });
     }
 
@@ -1504,7 +1556,7 @@
       if (view === "home") {
         navHome.classList.add("active");
         sectionTitle.textContent = "Плейлист дня";
-        sectionSub.textContent = "Рабочий плеер + регистрация через localStorage";
+        sectionSub.textContent = "Рабочий плеер + автовход через cookie";
       } else if (view === "my") {
         navMyMusic.classList.add("active");
         sectionTitle.textContent = "Моя музыка";
