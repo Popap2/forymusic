@@ -64,6 +64,21 @@ const uploadTracksFields = upload.fields([
   { name: 'file', maxCount: 1 },
 ]);
 
+/** Имя файла из multipart часто приходит как UTF-8, ошибочно прочитанный как Latin-1 (Ð¿ вместо п). */
+function recoverFilenameUtf8(s) {
+  if (!s || typeof s !== 'string') return s;
+  if (/[\u0400-\u04FF]/.test(s)) return s;
+  if (!/[ÐÑÂÃ]/.test(s)) return s;
+  try {
+    const recovered = Buffer.from(s, 'latin1').toString('utf8');
+    if (/\uFFFD/.test(recovered)) return s;
+    if (/[\u0400-\u04FF]/.test(recovered)) return recovered;
+  } catch (e) {
+    /* ignore */
+  }
+  return s;
+}
+
 function titleFromAudioOriginalName(originalname) {
   if (!originalname || typeof originalname !== 'string') return 'Без названия';
   const ext = path.extname(originalname);
@@ -73,6 +88,7 @@ function titleFromAudioOriginalName(originalname) {
   } catch (e) {
     /* ignore */
   }
+  base = recoverFilenameUtf8(base);
   base = base.replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim();
   return base || 'Без названия';
 }
